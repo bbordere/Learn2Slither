@@ -30,13 +30,20 @@ class GridParams:
 
 def convert_pos(seg: tuple[int, int], grid_params: GridParams):
     return (
-        grid_params.line_length * (seg[0] + 1) + grid_params.block_size[0] * seg[0]
-    ), (grid_params.line_length * (seg[1] + 1) + grid_params.block_size[1] * seg[1])
+        grid_params.line_length * (seg[0] + 1)
+        + grid_params.block_size[0] * seg[0]
+    ), (
+        grid_params.line_length * (seg[1] + 1)
+        + grid_params.block_size[1] * seg[1]
+    )
 
 
 class Consumable:
     def __init__(
-        self, pos: tuple[int, int], type: ConsumableType, grid_params: GridParams
+        self,
+        pos: tuple[int, int],
+        type: ConsumableType,
+        grid_params: GridParams,
     ):
         self.type = type
         self.pos = pos
@@ -173,7 +180,9 @@ class Snake:
 
 
 class Environment:
-    def __init__(self, grid_params: GridParams = GridParams((10, 10), (40, 40), 1)):
+    def __init__(
+        self, grid_params: GridParams = GridParams((10, 10), (40, 40), 1)
+    ):
         self.__grid_size = grid_params.grid_size
         self.__block_size = grid_params.block_size
         self.__line_length = grid_params.line_length
@@ -213,7 +222,9 @@ class Environment:
                     randint(0, self.__grid_params.grid_size[1] - 1),
                 )
             tmp.append(new)
-            self.__consumables.append(Consumable(new, type, self.__grid_params))
+            self.__consumables.append(
+                Consumable(new, type, self.__grid_params)
+            )
 
     def step(self, dir: Direction, render: bool = True):
         self.__snake.move(dir=dir)
@@ -226,7 +237,7 @@ class Environment:
 
         for consu in self.__consumables:
             if self.__snake.is_colliding(consu):
-                to_pop += 7 * (consu.type == ConsumableType.BAD) - (
+                to_pop += 1 * (consu.type == ConsumableType.BAD) - (
                     1 * (consu.type == ConsumableType.GOOD)
                 )
                 self.__place_Consumable(1, consu.type)
@@ -246,7 +257,7 @@ class Environment:
 
         if render:
             self.draw()
-        print(reward)
+        # print(reward)
         return False, reward
 
     def draw(self):
@@ -303,8 +314,8 @@ class Interpreter:
             ["0" for _ in range(self.__grid_params.grid_size[0] + 2)]
             for _ in range(self.__grid_params.grid_size[1] + 2)
         ]
-        self.__grid[0] = ["#"] * 12
-        self.__grid[-1] = ["#"] * 12
+        self.__grid[0] = ["#"] * (self.__grid_params.grid_size[1] + 2)
+        self.__grid[-1] = ["#"] * (self.__grid_params.grid_size[1] + 2)
         for line in self.__grid[1:-1]:
             line[0] = "#"
             line[-1] = "#"
@@ -320,7 +331,7 @@ class Interpreter:
             self.__grid[y + 1][x + 1] = str(c)
 
     def print_state(self, all: bool = False):
-        os.system("cls")
+        os.system("clear")
 
         self.__compute_grid()
         if all:
@@ -335,10 +346,25 @@ class Interpreter:
             Direction.DOWN: (0, 1),
             Direction.UP: (0, -1),
         }
-        obs_dist = 1
         gapple_seen = False
         bapple_seen = False
+        direct_danger = False
         x, y = head
+        x += check_dir[dir][0]
+        y += check_dir[dir][1]
+
+        if (
+            x < 0
+            or y < 0
+            or x >= self.__grid_params.grid_size[1]
+            or y >= self.__grid_params.grid_size[0]
+        ):
+            direct_danger = True
+
+        direct_danger = direct_danger or self.__grid[y + 1][x + 1] == "S"
+
+        x, y = head
+
         while True:
             x += check_dir[dir][0]
             y += check_dir[dir][1]
@@ -346,31 +372,31 @@ class Interpreter:
                 x < 0
                 or y < 0
                 or x >= self.__grid_params.grid_size[1]
-                or y >= self.__grid_params.grid_size[1]
+                or y >= self.__grid_params.grid_size[0]
             ):
                 break
             gapple_seen = gapple_seen or self.__grid[y + 1][x + 1] == "G"
             bapple_seen = bapple_seen or self.__grid[y + 1][x + 1] == "R"
-            if self.__grid[y + 1][x + 1] == "S":
-                break
-            obs_dist += 1
-        # print(dir, gapple_seen, bapple_seen, obs_dist)
-        return [obs_dist, gapple_seen, bapple_seen]
+
+        return [direct_danger, gapple_seen, bapple_seen]
 
     def get_state(self):
-        state = []
+        state = {}
         self.__compute_grid()
         for dir in Direction:
-            snake, _ = env.get_elements()
+            snake, _ = self.__env.get_elements()
             if not len(snake):
-                break
-            state.extend(self.__look_dir(dir, snake[0]))
-        return np.array(state)
+                return [False] * 12
+            state[dir] = self.__look_dir(dir, snake[0])
+        return np.array(
+            [[valeur[i] for valeur in state.values()] for i in range(3)]
+        ).flatten()
 
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 import numpy as np
 import random
 
@@ -378,16 +404,13 @@ import random
 class QNetwork(nn.Module):
     def __init__(self, state_size, action_size):
         super(QNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 64)
-        self.fc2 = nn.Linear(64, 32)
-        self.fc3 = nn.Linear(32, action_size)
-        self.fc4 = nn.Softmax(1)
+        self.fc1 = nn.Linear(state_size, 256)
+        self.fc2 = nn.Linear(256, action_size)
 
-    def forward(self, state):
-        x = torch.relu(self.fc1(state))
-        x = torch.relu(self.fc2(x))
-        x = self.fc3(x)
-        return self.fc4(x)
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = self.fc2(x)
+        return x
 
 
 class Agent:
@@ -395,8 +418,8 @@ class Agent:
         self,
         state_size,
         action_size,
-        learning_rate=1e-5,
-        gamma=0.99,
+        learning_rate=1e-3,
+        gamma=0.9,
         epsilon_start=1.0,
         epsilon_end=0.01,
         epsilon_decay=0.995,
@@ -409,8 +432,11 @@ class Agent:
         self.epsilon_decay = epsilon_decay
 
         self.q_network = QNetwork(state_size, action_size)
-        self.optimizer = optim.Adam(self.q_network.parameters(), lr=learning_rate)
+        self.optimizer = optim.Adam(
+            self.q_network.parameters(), lr=learning_rate
+        )
         self.criterion = nn.HuberLoss()
+        # self.criterion = nn.MSELoss()
 
     def select_action(self, state):
         if random.random() > self.epsilon:
@@ -433,7 +459,8 @@ class Agent:
         with torch.no_grad():
             next_q = self.q_network(next_state).max(1)[0].unsqueeze(1)
             target_q = (
-                reward.unsqueeze(1) + (1 - done.unsqueeze(1)) * self.gamma * next_q
+                reward.unsqueeze(1)
+                + (1 - done.unsqueeze(1)) * self.gamma * next_q
             )
 
         loss = self.criterion(current_q, target_q)
@@ -449,55 +476,163 @@ class Agent:
         self.q_network.load_state_dict(torch.load(filename))
 
 
+class TableAgent:
+    def __init__(self, alpha=0.1, gamma=0.9, epsilon=0.1):
+        self.nb_states = 2**12
+        self.nb_actions = 4
+        self.q_table = np.zeros((self.nb_states, self.nb_actions))
+        self.alpha = alpha
+        self.gamma = gamma
+        self.epsilon = epsilon
+
+    def state_to_index(self, state):
+        return int("".join(map(str, map(int, state))), 2)
+
+    def choose_action(self, state, train=True):
+        state_index = self.state_to_index(state)
+        if not train:
+            return np.argmax(self.q_table[state_index])
+        if np.random.random() < self.epsilon:
+            return np.random.randint(self.nb_actions)
+        else:
+            return np.argmax(self.q_table[state_index])
+
+    def update_q_table(self, state, action, reward, next_state):
+        state_index = self.state_to_index(state)
+        next_state_index = self.state_to_index(next_state)
+        current_q = self.q_table[state_index, action]
+        max_next_q = np.max(self.q_table[next_state_index])
+        new_q = (1 - self.alpha) * current_q + self.alpha * (
+            reward + self.gamma * max_next_q
+        )
+        self.q_table[state_index, action] = new_q
+
+    def train(self, nb_episodes, get_initial_state, step):
+        for episode in range(nb_episodes):
+            state = get_initial_state()
+            done = False
+            while not done:
+                action = self.choose_action(state)
+                next_state, reward, done = step(action)
+                self.update_q_table(state, action, reward, next_state)
+                state = next_state
+
+    def get_best_action(self, state):
+        state_index = self.state_to_index(state)
+        return np.argmax(self.q_table[state_index])
+
+
+def loop(env: Environment, clock, params):
+    interpreter = Interpreter(params, env)
+    agent = TableAgent(alpha=0.1, gamma=0.9, epsilon=0.1)
+
+    for episode in range(550000):
+        env.reset()
+        state = interpreter.get_state()
+        done = False
+        total_reward = 0
+        while not done:
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+                    return
+
+            # if episode > 49500:
+            # clock.tick(15)
+            action = agent.choose_action(state)
+            action = Direction(action)
+            done, reward = env.step(action, render=False)
+            next_state = interpreter.get_state()
+            agent.update_q_table(state, action.value, reward, next_state)
+            state = next_state
+            total_reward += reward
+        print(
+            f"Episode {episode}, Total Reward: {total_reward}, Length: {len(env.get_elements()[0])}"
+        )
+    with open("qtable.npy", "wb") as f:
+        np.save(f, agent.q_table)
+
+
 if __name__ == "__main__":
-    params = GridParams((10, 10), (40, 40), 1)
+    # params = GridParams((10, 10), (40, 40), 1)
+    # env = Environment(params)
+    # env.draw()
+    # gameover = False
+    # clock = pg.time.Clock()
+    # action = None
+    # loop(env, clock, params)
+
+    params = GridParams((50, 50), (10, 10), 1)
     env = Environment(params)
     env.draw()
     gameover = False
     clock = pg.time.Clock()
     action = None
-
     interpreter = Interpreter(params, env)
+    agent = TableAgent(alpha=0.1, gamma=0.9, epsilon=0.0)
+    agent.q_table = np.load("qtable500k.npy")
 
-    agent = Agent(state_size=12, action_size=4)
-    for episode in range(5000):
+    while True:
         env.reset()
-        state = interpreter.get_state()
-        total_reward = 0
         done = False
-
+        frames = 0
         while not done:
-            clock.tick(10)
-            action = agent.select_action(state)
+            clock.tick(20)
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+                    break
+            state = interpreter.get_state()
+            action = agent.choose_action(state)
+            action = Direction(action)
             done, reward = env.step(action)
-            if done:
-                break
-            next_state = interpreter.get_state()
-            agent.learn(state, action, reward, next_state, done)
-            state = next_state
-            total_reward += reward
-            interpreter.print_state()
-            print(state)
+            frames += 1
+        print(f"Frames {frames},Length: {len(env.get_elements()[0])}")
 
-        print(f"Episode {episode}, Total Reward: {total_reward}")
+    # agent = Agent(state_size=12, action_size=4)
+    # for episode in range(20000):
+    #     env.reset()
+    #     state = interpreter.get_state()
+    #     total_reward = 0
+    #     done = False
+
+    #     while not done:
+    #         # clock.tick(0.2)
+    #         # if episode > 19000:
+    #         # clock.tick(15)
+    #         action = agent.select_action(state)
+    #         done, reward = env.step(action, render=episode > 19000)
+    #         if done:
+    #             break
+    #         next_state = interpreter.get_state()
+    #         agent.learn(state, action, reward, next_state, done)
+    #         state = next_state
+    #         total_reward += reward
+    #         interpreter.print_state()
+    #         print(action)
+    #         print(state)
+
+    #     print(f"Episode {episode}, Total Reward: {total_reward}")
 
     # while not gameover:
-    #     clock.tick(0.5)
-    #     for event in pg.event.get():
-    #         if event.type == pg.QUIT:
-    #             pg.quit()
-    #         if event.type == pg.KEYDOWN:
-    #             if event.key == pg.K_LEFT:
-    #                 action = Direction.LEFT
-    #             if event.key == pg.K_UP:
-    #                 action = Direction.UP
-    #             if event.key == pg.K_RIGHT:
-    #                 action = Direction.RIGHT
-    #             if event.key == pg.K_DOWN:
-    #                 action = Direction.DOWN
-    #     if not action:
-    #         action = env.get_direction()
+    #     # clock.tick(5)
+    #     action = None
+    #     while not action:
+    #         for event in pg.event.get():
+    #             if event.type == pg.QUIT:
+    #                 pg.quit()
+    #             if event.type == pg.KEYDOWN:
+    #                 if event.key == pg.K_LEFT:
+    #                     action = Direction.LEFT
+    #                 if event.key == pg.K_UP:
+    #                     action = Direction.UP
+    #                 if event.key == pg.K_RIGHT:
+    #                     action = Direction.RIGHT
+    #                 if event.key == pg.K_DOWN:
+    #                     action = Direction.DOWN
+    #     # if not action:
+    #     # action = env.get_direction()
     #     gameover, slen = env.step(action)
     #     if not gameover:
-    #         interpreter.print_state()
+    #         interpreter.print_state(True)
     #         print(interpreter.get_state())
