@@ -1,220 +1,267 @@
 import pygame as pg
-from random import randint
-import numpy as np
-
+from config import *
 from Snake import Snake
-
-from utils import ConsumableType, GridParams, Direction, convert_pos
+from random import randint
 from Consumable import Consumable
+from Agent import BaseAgent, TableAgent
+import numpy as np
+from collections import deque
 
 
 class Environment:
-    def __init__(self, grid_params: GridParams = GridParams((10, 10), (40, 40), 1)):
-        self.__grid_size = grid_params.grid_size
-        self.__block_size = grid_params.block_size
-        self.__line_length = grid_params.line_length
-        self.__grid_params = grid_params
-        self.is_running = False
-        self.__screen_size = (
-            self.__block_size[0] * self.__grid_size[0]
-            + self.__line_length * (self.__grid_size[0] + 1),
-            self.__block_size[1] * self.__grid_size[1]
-            + self.__line_length * (self.__grid_size[1] + 1),
+    def __init__(self):
+        self.is_running = True
+        self.screen_size = Size(
+            width=BLOCK_WIDTH * GRID_WIDTH + LINE_WIDTH * (GRID_WIDTH + 1),
+            height=BLOCK_HEIGHT * GRID_HEIGHT + LINE_WIDTH * (GRID_HEIGHT + 1),
         )
-        self.__screen = pg.display.set_mode(self.__screen_size)
-        self.__snake = Snake(self.__grid_params, 3)
-        self.__consumables = []
+        self.screen = None
+        self.consumables = list[Consumable]()
+        self.snake = Snake()
+        pg.init()
+        self.clock = pg.time.Clock()
         self.reset()
+        self.agent = None
+        self.interpreter = None
+        self.state = None
+        self.memory = deque(maxlen=5)
 
     def reset(self):
-        self.__snake.reset()
-        self.__consumables = []
-        self.__place_Consumable(1, ConsumableType.BAD)
-        self.__place_Consumable(2, ConsumableType.GOOD)
+        self.consumables.clear()
+        self.snake.reset()
+        self.__place_Consumable(BAD_APPLE_NUM, ConsumableType.BAD)
+        self.__place_Consumable(GOOD_APPLE_NUM, ConsumableType.GOOD)
+        self.is_running = True
 
     def __place_Consumable(self, n: int, type: ConsumableType):
-        tmp = (
-            []
-            if not len(self.__consumables)
-            else [consu.pos for consu in self.__consumables]
-        )
         for _ in range(n):
-            new = (
-                randint(0, self.__grid_params.grid_size[0] - 1),
-                randint(0, self.__grid_params.grid_size[1] - 1),
+            new = Pos(
+                x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1)
             )
-            while self.__snake.is_colliding(new) or new in tmp:
-                new = (
-                    randint(0, self.__grid_params.grid_size[0] - 1),
-                    randint(0, self.__grid_params.grid_size[1] - 1),
+
+            if (
+                len(self.snake.segments) + len(self.consumables)
+                == GRID_WIDTH * GRID_HEIGHT
+            ):
+                return
+
+            while new in self.snake.segments or new in [
+                c.pos for c in self.consumables
+            ]:
+                new = Pos(
+                    x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1)
                 )
-            tmp.append(new)
-            self.__consumables.append(Consumable(new, type, self.__grid_params))
+            self.consumables.append(Consumable(new, type))
 
     def step(self, dir: Direction, render: bool = True):
-        self.__snake.move(dir=dir)
-
-        if self.__snake.is_colliding():
-            return True, -50
-
+        self.snake.move(dir)
+        if self.snake.is_colliding():
+            return True, DEAD_REWARD
         to_pop = 1
-        reward = -10
+        reward = DEFAULT_REWARD
 
-        for consu in self.__consumables:
-            if self.__snake.is_colliding(consu):
+        check_dir = {
+            Direction.RIGHT: (-1, 0),
+            Direction.LEFT: (1, 0),
+            Direction.DOWN: (0, -1),
+            Direction.UP: (0, 1),
+        }
+        check_dir.pop(self.snake.direction)
+
+        # head: Pos = self.snake.segments[0]
+        # for dx, dy in check_dir.values():
+        #     x = head.x + dx
+        #     y = head.y + dy
+        #     if (
+        #         x < 0
+        #         or y < 0
+        #         or x >= GRID_WIDTH
+        #         or y >= GRID_HEIGHT
+        #         or Pos(x, y) in self.snake.segments
+        #     ):
+        #         reward = PROXI_REWARD
+        #         break
+
+        for consu in self.consumables:
+            if self.snake.is_touching(consu.pos):
                 to_pop += 1 * (consu.type == ConsumableType.BAD) - (
                     1 * (consu.type == ConsumableType.GOOD)
                 )
+                self.consumables.remove(consu)
                 self.__place_Consumable(1, consu.type)
-                self.__consumables.remove(consu)
-                if consu.type == ConsumableType.GOOD:
-                    reward = 20
-                if consu.type == ConsumableType.BAD:
-                    reward = -20
-                break
+                reward = consu.reward
 
         for _ in range(to_pop):
-            if self.__snake.get_length():
-                self.__snake.pop()
-
-        if self.__snake.get_length() == 0:
-            return True, -50
+            if len(self.snake.segments):
+                self.snake.segments.pop()
+        if not len(self.snake.segments):
+            return True, DEAD_REWARD
 
         if render:
             self.draw()
         return False, reward
 
     def draw(self):
-        for row in range(self.__grid_size[1]):
-            for col in range(self.__grid_size[0]):
-                x = self.__line_length * (col + 1) + self.__block_size[0] * col
-                y = self.__line_length * (row + 1) + self.__block_size[1] * row
+        for row in range(GRID_HEIGHT):
+            for col in range(GRID_WIDTH):
+                x = LINE_WIDTH * (col + 1) + (BLOCK_WIDTH * col)
+                y = LINE_WIDTH * (row + 1) + (BLOCK_HEIGHT * row)
                 pg.draw.rect(
-                    self.__screen,
+                    self.screen,
                     (125, 125, 125),
-                    (x, y, self.__block_size[0], self.__block_size[1]),
+                    (x, y, BLOCK_WIDTH, BLOCK_HEIGHT),
                 )
-        for c in self.__consumables:
-            c.draw(self.__screen)
-        self.__snake.draw(self.__screen)
+        for c in self.consumables:
+            c.draw(self.screen)
+        self.snake.draw(self.screen)
         pg.display.flip()
 
-    def get_direction(self):
-        return self.__snake.get_direction()
+    def __handle_event(self, human: bool = False) -> Direction | bool:
+        action = None
+        if not human:
+            for event in pg.event.get():
+                if event.type == pg.QUIT:
+                    pg.quit()
+                    return False
+            return True
 
-    def get_elements(self):
-        return (self.__snake.get_segments(), self.__consumables)
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                pg.quit()
+                return False
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_LEFT:
+                    action = Direction.LEFT
+                if event.key == pg.K_UP:
+                    action = Direction.UP
+                if event.key == pg.K_RIGHT:
+                    action = Direction.RIGHT
+                if event.key == pg.K_DOWN:
+                    action = Direction.DOWN
+        return action
+
+    def __train_loop(self, episodes: int = 100, render: bool = True):
+        self.update_caption("Training")
+        for episode in range(episodes):
+            self.reset()
+            state = self.interpreter.get_state()
+            total_reward = 0
+            while self.is_running:
+                if not self.__handle_event(False):
+                    return
+                action = self.agent.choose_action(state)
+                done, reward = self.step(action, render=False)
+                next_state = self.interpreter.get_state()
+
+                if tuple(state) in self.memory:
+                    reward = -0.5
+                else:
+                    self.memory.append(tuple(state))
+                self.agent.learn(state, action, reward, next_state, done)
+                state = next_state
+                total_reward += reward
+                if done:
+                    break
+
+            self.agent.update_epsilon()
+            print(
+                f"Episode {episode}, Total Reward: {total_reward:.3f}, "
+                f"Length: {len(self.snake.segments) - 1}, Epsilon: {self.agent.epsilon:.4f}"
+            )
+        self.agent.save("models/model.npy")
+
+    def __test_loop(self, episodes: int, render: bool):
+        self.update_caption("Testing")
+        self.agent.load("models/model.npy")
+        for _ in range(episodes):
+            self.reset()
+            state = self.interpreter.get_state()
+            while self.is_running:
+                self.clock.tick(GAME_SPEED)
+                if not self.__handle_event(False):
+                    return
+                action = self.agent.choose_best_action(state)
+                self.is_running, _ = self.step(action, render=render)
+                self.is_running = not self.is_running
+                if not self.is_running:
+                    break
+                state = self.interpreter.get_state()
+
+    def __agent_loop(
+        self, episodes: int, train: bool = True, render: bool = True
+    ) -> bool:
+        if train:
+            self.__train_loop(episodes, render)
+        else:
+            self.__test_loop(episodes, render)
+
+    def __human_loop(
+        self, render: bool = True, step_mode: bool = True
+    ) -> bool:
+        self.update_caption("Human")
+        self.reset()
+        self.draw()
+        self.clock.tick(1)
+
+        while self.is_running:
+            if not step_mode:
+                self.clock.tick(HUMAN_GAME_SPEED)
+            action = None
+
+            get_input = False
+
+            while not get_input:
+                action = self.__handle_event(human=True)
+                if action == False:
+                    return
+                get_input = action or not step_mode
+
+            if not action:
+                action = self.snake.direction
+
+            self.is_running, _ = self.step(action, render)
+            self.is_running = not self.is_running
+            if not self.is_running:
+                break
+
+    def __init_window(self) -> None:
+        self.screen = pg.display.set_mode(self.screen_size)
+        pg.display.set_caption("Learn2Slither")
+
+    def update_caption(self, cap: str) -> None:
+        pg.display.set_caption(f"Learn2Slither ({cap})")
+
+    def run(
+        self,
+        episodes: int = 1000,
+        train: bool = True,
+        render: bool = True,
+        step_mode: bool = False,
+    ):
+        if render:
+            self.__init_window()
+
+        if self.agent and self.interpreter:
+            self.__agent_loop(episodes=episodes, train=train, render=render)
+        else:
+            self.__human_loop(render=render, step_mode=step_mode)
+
+    def attach(self, *args):
+        from Interpreter import Interpreter
+
+        for obj in args:
+            if isinstance(obj, BaseAgent):
+                self.agent = obj
+            if isinstance(obj, Interpreter):
+                self.interpreter = obj
 
 
-# import torch
-# import torch.nn as nn
-# import torch.optim as optim
-# import torch.nn.functional as F
-# import numpy as np
-# import random
+if __name__ == "__main__":
+    from Interpreter import Interpreter
 
-
-# class QNetwork(nn.Module):
-#     def __init__(self, state_size, action_size):
-#         super(QNetwork, self).__init__()
-#         self.fc1 = nn.Linear(state_size, 256)
-#         self.fc2 = nn.Linear(256, action_size)
-
-#     def forward(self, x):
-#         x = F.relu(self.fc1(x))
-#         x = self.fc2(x)
-#         return x
-
-
-# class Agent:
-#     def __init__(
-#         self,
-#         state_size,
-#         action_size,
-#         learning_rate=1e-3,
-#         gamma=0.9,
-#         epsilon_start=1.0,
-#         epsilon_end=0.01,
-#         epsilon_decay=0.995,
-#     ):
-#         self.state_size = state_size
-#         self.action_size = action_size
-#         self.gamma = gamma
-#         self.epsilon = epsilon_start
-#         self.epsilon_end = epsilon_end
-#         self.epsilon_decay = epsilon_decay
-
-#         self.q_network = QNetwork(state_size, action_size)
-#         self.optimizer = optim.Adam(
-#             self.q_network.parameters(), lr=learning_rate
-#         )
-#         self.criterion = nn.HuberLoss()
-#         # self.criterion = nn.MSELoss()
-
-#     def select_action(self, state):
-#         if random.random() > self.epsilon:
-#             with torch.no_grad():
-#                 state = torch.FloatTensor(state).unsqueeze(0)
-#                 q_values = self.q_network(state)
-#                 return Direction(q_values.max(1)[1].item())
-#         else:
-#             return Direction(random.randrange(self.action_size))
-
-#     def learn(self, state, action, reward, next_state, done):
-#         state = torch.FloatTensor(state).unsqueeze(0)
-#         next_state = torch.FloatTensor(next_state).unsqueeze(0)
-#         action = torch.LongTensor([action.value])
-#         reward = torch.FloatTensor([reward])
-#         done = torch.FloatTensor([done])
-
-#         current_q = self.q_network(state).gather(1, action.unsqueeze(1))
-
-#         with torch.no_grad():
-#             next_q = self.q_network(next_state).max(1)[0].unsqueeze(1)
-#             target_q = (
-#                 reward.unsqueeze(1)
-#                 + (1 - done.unsqueeze(1)) * self.gamma * next_q
-#             )
-
-#         loss = self.criterion(current_q, target_q)
-#         self.optimizer.zero_grad()
-#         loss.backward()
-#         self.optimizer.step()
-#         self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
-
-#     def save(self, filename):
-#         torch.save(self.q_network.state_dict(), filename)
-
-#     def load(self, filename):
-#         self.q_network.load_state_dict(torch.load(filename))
-
-
-# def loop(env: Environment, clock, params):
-#     interpreter = Interpreter(params, env)
-#     agent = TableAgent(alpha=0.1, gamma=0.9, epsilon=0.1)
-
-#     for episode in range(10000):
-#         env.reset()
-#         state = interpreter.get_state()
-#         done = False
-#         total_reward = 0
-#         while not done:
-#             for event in pg.event.get():
-#                 if event.type == pg.QUIT:
-#                     pg.quit()
-#                     return
-
-#             # if episode > 49500:
-#             # clock.tick(15)
-#             action = agent.choose_action(state)
-#             action = Direction(action)
-#             done, reward = env.step(action, render=False)
-#             next_state = interpreter.get_state()
-#             agent.update_q_table(state, action.value, reward, next_state)
-#             state = next_state
-#             total_reward += reward
-#         print(
-#             f"Episode {episode}, Total Reward: {total_reward}, Length: {len(env.get_elements()[0])}"
-#         )
-#     with open("qtable.npy", "wb") as f:
-#         np.save(f, agent.q_table)
+    env = Environment()
+    agent = BaseAgent(10, 10)
+    inter = Interpreter(env)
+    env.attach(agent, inter)
+    # env.attach(inter)
+    env.run(episodes=1, train=False, step_mode=False)

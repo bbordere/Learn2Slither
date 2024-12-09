@@ -1,115 +1,110 @@
-from utils import GridParams, Direction
+from config import *
 from Environment import Environment
 import numpy as np
 
 
 class Interpreter:
-    def __init__(self, grid_params: GridParams, env: Environment):
-        self.__grid_params = grid_params
-        self.__env = env
-        self.__grid = None
+    def __init__(self, env: Environment):
+        self.env = env
 
-    def __print_all(self):
-        for row in self.__grid:
+    def compute_grid(self):
+        self.grid = np.full((GRID_HEIGHT + 2, GRID_WIDTH + 2), "0")
+        self.grid[0] = np.repeat(["#"], GRID_WIDTH + 2)
+        self.grid[-1] = np.repeat(["#"], GRID_WIDTH + 2)
+        for line in self.grid[1:-1]:
+            line[0] = "#"
+            line[-1] = "#"
+        for i, seg in enumerate(self.env.snake.segments):
+            self.grid[seg.y + 1][seg.x + 1] = "H" if not i else "S"
+        for c in self.env.consumables:
+            self.grid[c.pos.y + 1][c.pos.x + 1] = str(c)
+
+    def print_env(self):
+        self.compute_grid()
+        for row in self.grid:
             print("".join(row).replace("0", " "))
 
-    def __print_vision(self, head: tuple[int, int]):
-        vision_grid = [
-            [" " for _ in range(self.__grid_params.grid_size[0] + 2)]
-            for _ in range(self.__grid_params.grid_size[1] + 2)
-        ]
-        head = (head[0] + 1, head[1] + 1)
-        for x in range(self.__grid_params.grid_size[0] + 2):
-            if x != head[0]:
-                vision_grid[head[1]][x] = self.__grid[head[1]][x]
+    def print_vision(self):
+        self.compute_grid()
+        vision_grid = np.full((GRID_HEIGHT + 2, GRID_WIDTH + 2), " ")
+        head = Pos(
+            self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1
+        )
+        for x in range(GRID_WIDTH + 2):
+            if x != head.x:
+                vision_grid[head.y][x] = self.grid[head.y][x]
 
-        for y in range(self.__grid_params.grid_size[1] + 2):
-            if y != head[1]:
-                vision_grid[y][head[0]] = self.__grid[y][head[0]]
-        vision_grid[head[1]][head[0]] = "H"
+        for y in range(GRID_HEIGHT + 2):
+            if y != head.y:
+                vision_grid[y][head.x] = self.grid[y][head.x]
+        vision_grid[head.y][head.x] = "H"
         for row in vision_grid:
             print("".join(row))
 
-    def __compute_grid(self):
-        self.__grid = [
-            ["0" for _ in range(self.__grid_params.grid_size[0] + 2)]
-            for _ in range(self.__grid_params.grid_size[1] + 2)
-        ]
-
-        self.__grid[0] = ["#"] * (self.__grid_params.grid_size[0] + 2)
-        self.__grid[-1] = ["#"] * (self.__grid_params.grid_size[0] + 2)
-        for line in self.__grid[1:-1]:
-            line[0] = "#"
-            line[-1] = "#"
-
-        snake, consumables = self.__env.get_elements()
-        for i, (sx, sy) in enumerate(snake):
-            if i == 0:
-                self.__grid[sy + 1][sx + 1] = "H"
-            else:
-                self.__grid[sy + 1][sx + 1] = "S"
-        for c in consumables:
-            (x, y) = c.pos
-            self.__grid[y + 1][x + 1] = str(c)
-
-    def print_state(self, all: bool = False):
-        # os.system("clear")
-
-        self.__compute_grid()
-        if all:
-            self.__print_all()
-        else:
-            self.__print_vision(self.__env.get_elements()[0][0])
-
-    def __look_dir(self, dir: Direction, head: tuple[int, int]):
+    def __look_dir(self, dir: Direction):
         check_dir = {
-            Direction.RIGHT: (1, 0),
-            Direction.LEFT: (-1, 0),
-            Direction.DOWN: (0, 1),
-            Direction.UP: (0, -1),
+            Direction.RIGHT: Pos(1, 0),
+            Direction.LEFT: Pos(-1, 0),
+            Direction.DOWN: Pos(0, 1),
+            Direction.UP: Pos(0, -1),
         }
         gapple_seen = False
         bapple_seen = False
         direct_danger = False
-        x, y = head
-        x += check_dir[dir][0]
-        y += check_dir[dir][1]
 
-        if (
-            x < 0
-            or y < 0
-            or x >= self.__grid_params.grid_size[1]
-            or y >= self.__grid_params.grid_size[0]
-        ):
+        head = self.env.snake.segments[0]
+
+        x, y = head.x, head.y
+        x += check_dir[dir].x
+        y += check_dir[dir].y
+
+        if x < 0 or y < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
             direct_danger = True
 
-        direct_danger = direct_danger or self.__grid[y + 1][x + 1] == "S"
-
-        x, y = head
+        direct_danger = direct_danger or self.grid[y + 1][x + 1] == "S"
+        x, y = head.x, head.y
 
         while True:
-            x += check_dir[dir][0]
-            y += check_dir[dir][1]
-            if (
-                x < 0
-                or y < 0
-                or x >= self.__grid_params.grid_size[0]
-                or y >= self.__grid_params.grid_size[1]
-            ):
+            x += check_dir[dir].x
+            y += check_dir[dir].y
+            if x < 0 or y < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
                 break
-            gapple_seen = gapple_seen or self.__grid[y + 1][x + 1] == "G"
-            bapple_seen = bapple_seen or self.__grid[y + 1][x + 1] == "R"
-
+            gapple_seen = gapple_seen or self.grid[y + 1][x + 1] == "G"
+            bapple_seen = bapple_seen or self.grid[y + 1][x + 1] == "R"
         return [direct_danger, gapple_seen, bapple_seen]
 
     def get_state(self):
         state = {}
-        self.__compute_grid()
+        self.compute_grid()
+        snake = self.env.snake.segments
         for dir in Direction:
-            snake, _ = self.__env.get_elements()
             if not len(snake):
-                return np.array([False] * 12)
-            state[dir] = self.__look_dir(dir, snake[0])
-        return np.array(
-            [[valeur[i] for valeur in state.values()] for i in range(3)]
-        ).flatten()
+                return np.array([False] * (5 * 4))
+            state[dir] = self.__look_dir(dir)
+        arr = list(
+            np.array(
+                [
+                    [valeur[i] for valeur in state.values()]
+                    for i in range(len(state[dir]))
+                ]
+            ).flatten()
+        )
+        # arr.extend(
+        #     [
+        #         self.env.snake.direction == Direction.UP,
+        #         self.env.snake.direction == Direction.RIGHT,
+        #         self.env.snake.direction == Direction.DOWN,
+        #         self.env.snake.direction == Direction.LEFT,
+        #     ]
+        # )
+        return np.array(arr).flatten()
+
+
+if __name__ == "__main__":
+    env = Environment()
+    print("DIR:", env.snake.direction)
+    i = Interpreter(env)
+    i.print_env()
+    i.print_vision()
+    print(i.get_state())
+    env.run()

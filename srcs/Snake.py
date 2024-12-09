@@ -1,90 +1,69 @@
-from utils import GridParams, Direction, convert_pos
-from Consumable import Consumable
-import pygame as pg
+from config import *
 from random import randint, choice
+import pygame as pg
 
 
 class Snake:
-    def __init__(self, grid_params: GridParams, start_len: int = 3):
-        self.__segments = []
-        self.__start_len = start_len
-        self.__grid_params = grid_params
-        self.__color = (0, 0, 255)
-        self.__direction = None
+    def __init__(self):
+        self.segments = list[Pos]()
+        self.body_color = (0, 0, 255)
+        self.head_color = (245, 67, 89)
+        self.direction = None
         self.reset()
 
-    def get_length(self):
-        return len(self.__segments)
-
-    def pop(self):
-        self.__segments.pop()
-
     def reset(self):
-        self.__segments.clear()
-        self.__segments.append(
-            (
-                randint(1, self.__grid_params.grid_size[0] - 2),
-                randint(1, self.__grid_params.grid_size[1] - 2),
-            )
+        self.segments.clear()
+        self.segments.append(
+            Pos(x=randint(1, GRID_WIDTH - 2), y=randint(1, GRID_HEIGHT - 2))
         )
-
         check_dir = {
-            Direction.RIGHT: (-1, 0),
-            Direction.LEFT: (1, 0),
-            Direction.DOWN: (0, -1),
-            Direction.UP: (0, 1),
+            Direction.RIGHT: Pos(-1, 0),
+            Direction.LEFT: Pos(1, 0),
+            Direction.DOWN: Pos(0, -1),
+            Direction.UP: Pos(0, 1),
         }
-
         all_dir = [
             (
-                direction,
+                dir,
                 [
-                    (
-                        self.__segments[0][0] + (i + 1) * delta[0],
-                        self.__segments[0][1] + (i + 1) * delta[1],
+                    Pos(
+                        self.segments[0].x + (i + 1) * delta[0],
+                        self.segments[0].y + (i + 1) * delta[1],
                     )
-                    for i in range(self.__start_len - 1)
+                    for i in range(DEFAULT_LEN - 1)
                 ],
             )
-            for direction, delta in check_dir.items()
+            for dir, delta in check_dir.items()
         ]
-
         possible_dir = [
             move
             for move in all_dir
             if all(
-                x >= 0
-                and y >= 0
-                and x < self.__grid_params.grid_size[0]
-                and y < self.__grid_params.grid_size[1]
+                x >= 0 and y >= 0 and x < GRID_WIDTH and y < GRID_HEIGHT
                 for x, y in move[1]
             )
         ]
-
         c = choice(possible_dir)
-        self.__direction = c[0]
-        self.__segments.extend(c[1])
+        self.direction = c[0]
+        self.segments.extend(c[1])
 
     def draw(self, screen: pg.surface):
-        for seg in self.__segments:
-            x, y = convert_pos(seg, self.__grid_params)
+        for seg in self.segments:
+            x, y = convert_pos(seg)
             pg.draw.rect(
                 screen,
-                (245, 67, 89) if seg == self.__segments[0] else self.__color,
                 (
-                    x,
-                    y,
-                    self.__grid_params.block_size[0],
-                    self.__grid_params.block_size[1],
+                    self.head_color
+                    if seg == self.segments[0]
+                    else self.body_color
                 ),
+                (x, y, BLOCK_WIDTH, BLOCK_HEIGHT),
             )
 
-        pg.display.flip()
-
     def move(self, dir: Direction):
-        x, y = self.__segments[0][0], self.__segments[0][1]
-        if dir == Direction((self.__direction.value + 2) % 4):
-            dir = self.__direction
+        x, y = self.segments[0].x, self.segments[0].y
+        if dir == Direction((self.direction.value + 2) % 4):
+            dir = self.direction
         if dir == Direction.UP:
             y -= 1
         elif dir == Direction.DOWN:
@@ -93,25 +72,23 @@ class Snake:
             x -= 1
         else:
             x += 1
+        self.segments.insert(0, Pos(x, y))
+        self.direction = dir
 
-        self.__segments.insert(0, (x, y))
-        self.__direction = dir
+    def is_colliding(self):
+        return (
+            self.segments[0].x > GRID_WIDTH - 1
+            or self.segments[0].x < 0
+            or self.segments[0].y > GRID_HEIGHT - 1
+            or self.segments[0].y < 0
+            or self.segments[0] in self.segments[1:]
+        )
 
-    def is_colliding(self, object: tuple[int, int] | Consumable = None):
-        if not object:
-            return (
-                self.__segments[0][0] > self.__grid_params.grid_size[0] - 1
-                or self.__segments[0][0] < 0
-                or self.__segments[0][1] > self.__grid_params.grid_size[1] - 1
-                or self.__segments[0][1] < 0
-                or self.__segments[0] in self.__segments[1:]
-            )
-        if isinstance(object, Consumable):
-            return object.pos in self.__segments
-        return self.__segments[0] == object
+    def is_touching(self, pos: Pos):
+        return self.segments[0] == pos
 
-    def get_direction(self):
-        return self.__direction
 
-    def get_segments(self):
-        return self.__segments
+if __name__ == "__main__":
+
+    s = Snake()
+    print(s.direction, s.segments)
