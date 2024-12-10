@@ -1,5 +1,5 @@
 import numpy as np
-from config import Direction
+from config import Direction, DEAD_REWARD
 from random import choice, random
 
 
@@ -108,10 +108,8 @@ class TableAgent(BaseAgent):
         state_index = self.state_to_index(state)
         next_state_index = self.state_to_index(next_state)
         current_q = self.q_table[state_index, action.value]
-        max_next_q = 0 if done else np.max(self.q_table[next_state_index])
-        new_q = (1 - self.lr) * current_q + self.lr * (
-            reward + self.gamma * max_next_q
-        )
+        max_next_q = DEAD_REWARD if done else np.max(self.q_table[next_state_index])
+        new_q = (1 - self.lr) * current_q + self.lr * (reward + self.gamma * max_next_q)
         self.q_table[state_index, action.value] = new_q
 
     def choose_best_action(self, state: np.ndarray) -> Direction:

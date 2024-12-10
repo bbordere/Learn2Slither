@@ -4,6 +4,7 @@ from Snake import Snake
 from random import randint
 from Consumable import Consumable
 from Agent import BaseAgent, TableAgent
+from Logger import Logger
 import numpy as np
 from collections import deque
 
@@ -24,7 +25,8 @@ class Environment:
         self.agent = None
         self.interpreter = None
         self.state = None
-        self.memory = deque(maxlen=5)
+        self.memory = deque(maxlen=10)
+        self.logger = Logger()
 
     def reset(self):
         self.consumables.clear()
@@ -35,9 +37,7 @@ class Environment:
 
     def __place_Consumable(self, n: int, type: ConsumableType):
         for _ in range(n):
-            new = Pos(
-                x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1)
-            )
+            new = Pos(x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1))
 
             if (
                 len(self.snake.segments) + len(self.consumables)
@@ -48,9 +48,7 @@ class Environment:
             while new in self.snake.segments or new in [
                 c.pos for c in self.consumables
             ]:
-                new = Pos(
-                    x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1)
-                )
+                new = Pos(x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1))
             self.consumables.append(Consumable(new, type))
 
     def step(self, dir: Direction, render: bool = True):
@@ -164,10 +162,14 @@ class Environment:
                     break
 
             self.agent.update_epsilon()
-            print(
-                f"Episode {episode}, Total Reward: {total_reward:.3f}, "
-                f"Length: {len(self.snake.segments) - 1}, Epsilon: {self.agent.epsilon:.4f}"
-            )
+
+            # logger.log(episode, total_reward, len)
+            self.logger.log_train(episode, total_reward, len(self.snake.segments) - 1)
+
+            # print(
+            #     f"Episode {episode}, Total Reward: {total_reward:.3f}, "
+            #     f"Length: {len(self.snake.segments) - 1}, Epsilon: {self.agent.epsilon:.4f}"
+            # )
         self.agent.save("models/model.npy")
 
     def __test_loop(self, episodes: int, render: bool):
@@ -186,6 +188,8 @@ class Environment:
                 if not self.is_running:
                     break
                 state = self.interpreter.get_state()
+            self.logger.log_test(len(self.snake.segments))
+        self.logger.final()
 
     def __agent_loop(
         self, episodes: int, train: bool = True, render: bool = True
@@ -195,9 +199,7 @@ class Environment:
         else:
             self.__test_loop(episodes, render)
 
-    def __human_loop(
-        self, render: bool = True, step_mode: bool = True
-    ) -> bool:
+    def __human_loop(self, render: bool = True, step_mode: bool = True) -> bool:
         self.update_caption("Human")
         self.reset()
         self.draw()
@@ -223,6 +225,7 @@ class Environment:
             self.is_running = not self.is_running
             if not self.is_running:
                 break
+        # self.logger.final()
 
     def __init_window(self) -> None:
         self.screen = pg.display.set_mode(self.screen_size)

@@ -27,9 +27,7 @@ class Interpreter:
     def print_vision(self):
         self.compute_grid()
         vision_grid = np.full((GRID_HEIGHT + 2, GRID_WIDTH + 2), " ")
-        head = Pos(
-            self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1
-        )
+        head = Pos(self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1)
         for x in range(GRID_WIDTH + 2):
             if x != head.x:
                 vision_grid[head.y][x] = self.grid[head.y][x]
@@ -64,13 +62,29 @@ class Interpreter:
         direct_danger = direct_danger or self.grid[y + 1][x + 1] == "S"
         x, y = head.x, head.y
 
+        distance = 0
+
+        near_danger = False
+
         while True:
             x += check_dir[dir].x
             y += check_dir[dir].y
+            distance += 1
             if x < 0 or y < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
                 break
             gapple_seen = gapple_seen or self.grid[y + 1][x + 1] == "G"
             bapple_seen = bapple_seen or self.grid[y + 1][x + 1] == "R"
+
+            dir = self.env.snake.direction
+
+            check = (dir == Direction.DOWN or dir == Direction.UP) * GRID_HEIGHT + (
+                dir == Direction.RIGHT or dir == Direction.LEFT
+            ) * GRID_WIDTH
+
+            near_danger = near_danger or (
+                (self.grid[y + 1][x + 1] == "S") and distance <= 5
+            )
+
         return [direct_danger, gapple_seen, bapple_seen]
 
     def get_state(self):
