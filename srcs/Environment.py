@@ -7,6 +7,7 @@ from Agent import BaseAgent, TableAgent
 from Logger import Logger
 import numpy as np
 from collections import deque
+from utils import *
 
 
 class Environment:
@@ -25,8 +26,8 @@ class Environment:
         self.agent = None
         self.interpreter = None
         self.state = None
-        self.memory = deque(maxlen=10)
-        self.logger = Logger()
+        self.memory = deque(maxlen=5)
+        self.logger = Logger(log_period=100)
 
     def reset(self):
         self.consumables.clear()
@@ -147,14 +148,17 @@ class Environment:
             while self.is_running:
                 if not self.__handle_event(False):
                     return
+                if render:
+                    self.clock.tick(GAME_SPEED)
+
                 action = self.agent.choose_action(state)
-                done, reward = self.step(action, render=False)
+                done, reward = self.step(action, render=render)
                 next_state = self.interpreter.get_state()
 
-                if tuple(state) in self.memory:
-                    reward = -0.5
-                else:
-                    self.memory.append(tuple(state))
+                # if tuple(state) in self.memory:
+                #     reward = -0.5
+                # else:
+                #     self.memory.append(tuple(state))
                 self.agent.learn(state, action, reward, next_state, done)
                 state = next_state
                 total_reward += reward
@@ -164,12 +168,15 @@ class Environment:
             self.agent.update_epsilon()
 
             # logger.log(episode, total_reward, len)
-            self.logger.log_train(episode, total_reward, len(self.snake.segments) - 1)
+            self.logger.log_train(
+                episode + 1, total_reward, len(self.snake.segments) - 1
+            )
 
             # print(
             #     f"Episode {episode}, Total Reward: {total_reward:.3f}, "
             #     f"Length: {len(self.snake.segments) - 1}, Epsilon: {self.agent.epsilon:.4f}"
             # )
+        self.logger.log_train(episode, total_reward, len(self.snake.segments) - 1)
         self.agent.save("models/model.npy")
 
     def __test_loop(self, episodes: int, render: bool):
@@ -179,9 +186,10 @@ class Environment:
             self.reset()
             state = self.interpreter.get_state()
             while self.is_running:
-                self.clock.tick(GAME_SPEED)
                 if not self.__handle_event(False):
                     return
+                if render:
+                    self.clock.tick(GAME_SPEED)
                 action = self.agent.choose_best_action(state)
                 self.is_running, _ = self.step(action, render=render)
                 self.is_running = not self.is_running
@@ -225,6 +233,21 @@ class Environment:
             self.is_running = not self.is_running
             if not self.is_running:
                 break
+            state = self.interpreter.get_state()
+            new_state = [
+                (
+                    state[i] or state[i + 1] == 1 or state[i + 2] == 1,
+                    state[i + 3] != 0,
+                    state[i + 4] != 0,
+                )
+                for i in range(0, len(state), 5)
+            ]
+            new_state = np.array(new_state).flatten()
+            for i in range(0, 11, 3):
+                print(
+                    Direction(i // 3), new_state[i], new_state[i + 1], new_state[i + 2]
+                )
+            print()
         # self.logger.final()
 
     def __init_window(self) -> None:

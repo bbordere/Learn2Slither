@@ -1,6 +1,7 @@
 from config import *
 from Environment import Environment
 import numpy as np
+from utils import *
 
 
 class Interpreter:
@@ -40,6 +41,9 @@ class Interpreter:
             print("".join(row))
 
     def __look_dir(self, dir: Direction):
+        # if not len(self.env.snake.segments):
+        #     return [True, True, True]
+
         check_dir = {
             Direction.RIGHT: Pos(1, 0),
             Direction.LEFT: Pos(-1, 0),
@@ -50,59 +54,88 @@ class Interpreter:
         bapple_seen = False
         direct_danger = False
 
-        head = self.env.snake.segments[0]
+        head = Pos(self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1)
 
         x, y = head.x, head.y
+
         x += check_dir[dir].x
         y += check_dir[dir].y
 
-        if x < 0 or y < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
+        if (
+            x < 0
+            or y < 0
+            or x >= GRID_WIDTH + 1
+            or y >= GRID_HEIGHT + 1
+            or self.grid[y][x] == "S"
+            or self.grid[y][x] == "#"
+        ):
             direct_danger = True
 
-        direct_danger = direct_danger or self.grid[y + 1][x + 1] == "S"
-        x, y = head.x, head.y
-
-        distance = 0
-
-        near_danger = False
+        distance = 1
+        gapple_distance = 0
+        bapple_distance = 0
+        wall_distance = 0
+        seg_distance = 0
 
         while True:
+            # print(dir, self.grid[y + 1][x + 1])
+            if x < 0 or y < 0 or x >= GRID_WIDTH + 1 or y >= GRID_HEIGHT + 1:
+                break
+
+            if not gapple_distance and self.grid[y][x] == "G":
+                gapple_distance = distance
+
+            if not bapple_distance and self.grid[y][x] == "R":
+                bapple_distance = distance
+
+            if not wall_distance and self.grid[y][x] == "#":
+                wall_distance = distance
+
+            if not seg_distance and self.grid[y][x] == "S":
+                seg_distance = distance
+
             x += check_dir[dir].x
             y += check_dir[dir].y
             distance += 1
-            if x < 0 or y < 0 or x >= GRID_WIDTH or y >= GRID_HEIGHT:
-                break
-            gapple_seen = gapple_seen or self.grid[y + 1][x + 1] == "G"
-            bapple_seen = bapple_seen or self.grid[y + 1][x + 1] == "R"
 
-            dir = self.env.snake.direction
+        # print()
 
-            check = (dir == Direction.DOWN or dir == Direction.UP) * GRID_HEIGHT + (
-                dir == Direction.RIGHT or dir == Direction.LEFT
-            ) * GRID_WIDTH
+        # return [
+        #     direct_danger,
+        #     bapple_distance != 0,
+        #     gapple_distance != 0,
+        # ]
 
-            near_danger = near_danger or (
-                (self.grid[y + 1][x + 1] == "S") and distance <= 5
-            )
+        return [
+            direct_danger,
+            seg_distance,
+            wall_distance,
+            gapple_distance,
+            bapple_distance,
+        ]
 
-        return [direct_danger, gapple_seen, bapple_seen]
+        # return [False, False, False]
 
     def get_state(self):
+        if not len(self.env.snake.segments):
+            return np.zeros((5))
         state = {}
         self.compute_grid()
-        snake = self.env.snake.segments
         for dir in Direction:
-            if not len(snake):
-                return np.array([False] * (5 * 4))
             state[dir] = self.__look_dir(dir)
-        arr = list(
-            np.array(
-                [
-                    [valeur[i] for valeur in state.values()]
-                    for i in range(len(state[dir]))
-                ]
-            ).flatten()
-        )
+
+        # print(state)
+        # arr = list(
+        #     np.array(
+        #         [
+        #             [valeur[i] for valeur in state.values()]
+        #             for i in range(len(state[dir]))
+        #         ]
+        #     ).flatten()
+        # )
+
+        arr = np.array(list(state.values())).flatten()
+
         # arr.extend(
         #     [
         #         self.env.snake.direction == Direction.UP,
@@ -111,7 +144,7 @@ class Interpreter:
         #         self.env.snake.direction == Direction.LEFT,
         #     ]
         # )
-        return np.array(arr).flatten()
+        return arr
 
 
 if __name__ == "__main__":

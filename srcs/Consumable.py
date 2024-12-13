@@ -1,5 +1,6 @@
 from config import *
 import pygame as pg
+from utils import *
 
 
 class Consumable:

@@ -1,6 +1,7 @@
 import numpy as np
-from config import Direction, DEAD_REWARD
+from config import DEAD_REWARD
 from random import choice, random
+from utils import *
 
 
 class BaseAgent:
@@ -56,7 +57,7 @@ class TableAgent(BaseAgent):
         lr: float = 0.1,
         gamma: float = 0.9,
         epsilon: float = 1.0,
-        epsilon_min: float = 0.001,
+        epsilon_min: float = 0.01,
         epsilon_decay: float = 0.995,
     ):
         super().__init__(
@@ -72,10 +73,21 @@ class TableAgent(BaseAgent):
 
     def choose_action(self, state):
         state_index = self.state_to_index(state)
+
         if np.random.random() >= self.epsilon:
             return Direction(np.argmax(self.q_table[state_index]))
-        else:
-            return Direction(np.random.randint(self.action_size))
+
+        q_values = self.q_table[state_index]
+        scaled_qs = q_values / self.epsilon
+        exp_qs = np.exp(scaled_qs - np.max(scaled_qs))
+        probabilities = exp_qs / np.sum(exp_qs)
+        action = np.random.choice(self.action_size, p=probabilities)
+        return Direction(action)
+
+        # if np.random.random() >= self.epsilon:
+        #     return Direction(np.argmax(self.q_table[state_index]))
+        # else:
+        #     return Direction(np.random.randint(self.action_size))
 
     def load(self, path: str) -> None:
         self.q_table = np.load(path)
@@ -85,7 +97,20 @@ class TableAgent(BaseAgent):
             np.save(f, self.q_table)
 
     def state_to_index(self, state: np.ndarray) -> int:
-        return int("".join(map(str, map(int, state))), 2)
+        new_state = [
+            (
+                state[i],
+                # state[i] or state[i + 1] == 1 or state[i + 2] == 1,
+                state[i + 3] != 0,
+                state[i + 4] != 0,
+            )
+            for i in range(0, len(state), 5)
+        ]
+
+        new_state = np.array(new_state).flatten()
+
+        return int("".join(map(str, map(int, new_state))), 2)
+        # return int("".join(map(str, map(int, state))), 2)
 
     def learn(
         self,
@@ -108,10 +133,19 @@ class TableAgent(BaseAgent):
         state_index = self.state_to_index(state)
         next_state_index = self.state_to_index(next_state)
         current_q = self.q_table[state_index, action.value]
-        max_next_q = DEAD_REWARD if done else np.max(self.q_table[next_state_index])
+        max_next_q = np.max(self.q_table[next_state_index])
         new_q = (1 - self.lr) * current_q + self.lr * (reward + self.gamma * max_next_q)
         self.q_table[state_index, action.value] = new_q
 
     def choose_best_action(self, state: np.ndarray) -> Direction:
         state_index = self.state_to_index(state)
         return Direction(np.argmax(self.q_table[state_index]))
+
+        # q_values = self.q_table[state_index]
+        # scaled_qs = q_values / self.epsilon
+        # exp_qs = np.exp(scaled_qs - np.max(scaled_qs))
+        # probabilities = exp_qs / np.sum(exp_qs)
+        # action = np.random.choice(
+        #     self.action_size, p=probabilities
+        # )
+        # return Direction(action)

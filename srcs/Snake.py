@@ -1,6 +1,7 @@
 from config import *
 from random import randint, choice
 import pygame as pg
+from utils import *
 
 
 class Snake:
@@ -52,11 +53,7 @@ class Snake:
             x, y = convert_pos(seg)
             pg.draw.rect(
                 screen,
-                (
-                    self.head_color
-                    if seg == self.segments[0]
-                    else self.body_color
-                ),
+                (self.head_color if seg == self.segments[0] else self.body_color),
                 (x, y, BLOCK_WIDTH, BLOCK_HEIGHT),
             )
 
