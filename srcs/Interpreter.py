@@ -118,7 +118,7 @@ class Interpreter:
 
     def get_state(self):
         if not len(self.env.snake.segments):
-            return np.zeros((5))
+            return np.zeros((20))
         state = {}
         self.compute_grid()
         for dir in Direction:
