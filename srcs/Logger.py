@@ -53,7 +53,9 @@ class Logger:
                     tabulate(
                         self.stats,
                         header,
-                        tablefmt="simple_outline" if not self.file else "plain",
+                        tablefmt=(
+                            "simple_outline" if not self.file else "plain"
+                        ),
                     ),
                     file=self.file,
                 )

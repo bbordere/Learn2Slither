@@ -53,7 +53,11 @@ class Snake:
             x, y = convert_pos(seg)
             pg.draw.rect(
                 screen,
-                (self.head_color if seg == self.segments[0] else self.body_color),
+                (
+                    self.head_color
+                    if seg == self.segments[0]
+                    else self.body_color
+                ),
                 (x, y, BLOCK_WIDTH, BLOCK_HEIGHT),
             )
 
@@ -78,7 +82,7 @@ class Snake:
             or self.segments[0].x < 0
             or self.segments[0].y > GRID_HEIGHT - 1
             or self.segments[0].y < 0
-            or self.segments[0] in self.segments[1:]
+            or self.segments[0] in self.segments[1:-1]
         )
 
     def is_touching(self, pos: Pos):

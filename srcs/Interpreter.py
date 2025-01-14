@@ -28,7 +28,9 @@ class Interpreter:
     def print_vision(self):
         self.compute_grid()
         vision_grid = np.full((GRID_HEIGHT + 2, GRID_WIDTH + 2), " ")
-        head = Pos(self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1)
+        head = Pos(
+            self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1
+        )
         for x in range(GRID_WIDTH + 2):
             if x != head.x:
                 vision_grid[head.y][x] = self.grid[head.y][x]
@@ -54,7 +56,9 @@ class Interpreter:
         bapple_seen = False
         direct_danger = False
 
-        head = Pos(self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1)
+        head = Pos(
+            self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1
+        )
 
         x, y = head.x, head.y
 
@@ -72,27 +76,36 @@ class Interpreter:
             direct_danger = True
 
         distance = 1
-        gapple_distance = 0
-        bapple_distance = 0
-        wall_distance = 0
-        seg_distance = 0
+        max_distance = (
+            GRID_WIDTH
+            if (
+                self.env.snake.direction == Direction.LEFT
+                or self.env.snake.direction == Direction.RIGHT
+            )
+            else GRID_HEIGHT
+        )
+
+        gapple_distance = 1.0
+        bapple_distance = 1.0
+        wall_distance = 1.0
+        seg_distance = 1.0
 
         while True:
             # print(dir, self.grid[y + 1][x + 1])
             if x < 0 or y < 0 or x >= GRID_WIDTH + 1 or y >= GRID_HEIGHT + 1:
                 break
 
-            if not gapple_distance and self.grid[y][x] == "G":
-                gapple_distance = distance
+            if gapple_distance == 1.0 and self.grid[y][x] == "G":
+                gapple_distance = distance / max_distance
 
-            if not bapple_distance and self.grid[y][x] == "R":
-                bapple_distance = distance
+            if bapple_distance == 1.0 and self.grid[y][x] == "R":
+                bapple_distance = distance / max_distance
 
-            if not wall_distance and self.grid[y][x] == "#":
-                wall_distance = distance
+            if wall_distance == 1.0 and self.grid[y][x] == "#":
+                wall_distance = distance / max_distance
 
-            if not seg_distance and self.grid[y][x] == "S":
-                seg_distance = distance
+            if seg_distance == 1.0 and self.grid[y][x] == "S":
+                seg_distance = distance / max_distance
 
             x += check_dir[dir].x
             y += check_dir[dir].y

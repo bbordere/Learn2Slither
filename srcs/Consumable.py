@@ -12,7 +12,9 @@ class Consumable:
         self.type = type
         self.pos = pos
         self.reward = (
-            GOOD_APPLE_REWARD if type == ConsumableType.GOOD else BAD_APPLE_REWARD
+            GOOD_APPLE_REWARD
+            if type == ConsumableType.GOOD
+            else BAD_APPLE_REWARD
         )
 
     def __str__(self):
