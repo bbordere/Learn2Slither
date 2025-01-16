@@ -28,9 +28,7 @@ class Interpreter:
     def print_vision(self):
         self.compute_grid()
         vision_grid = np.full((GRID_HEIGHT + 2, GRID_WIDTH + 2), " ")
-        head = Pos(
-            self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1
-        )
+        head = Pos(self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1)
         for x in range(GRID_WIDTH + 2):
             if x != head.x:
                 vision_grid[head.y][x] = self.grid[head.y][x]
@@ -56,9 +54,7 @@ class Interpreter:
         bapple_seen = False
         direct_danger = False
 
-        head = Pos(
-            self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1
-        )
+        head = Pos(self.env.snake.segments[0].x + 1, self.env.snake.segments[0].y + 1)
 
         x, y = head.x, head.y
 
@@ -78,10 +74,7 @@ class Interpreter:
         distance = 1
         max_distance = (
             GRID_WIDTH
-            if (
-                self.env.snake.direction == Direction.LEFT
-                or self.env.snake.direction == Direction.RIGHT
-            )
+            if (dir == Direction.LEFT or dir == Direction.RIGHT)
             else GRID_HEIGHT
         )
 
@@ -91,7 +84,6 @@ class Interpreter:
         seg_distance = 1.0
 
         while True:
-            # print(dir, self.grid[y + 1][x + 1])
             if x < 0 or y < 0 or x >= GRID_WIDTH + 1 or y >= GRID_HEIGHT + 1:
                 break
 
@@ -111,14 +103,6 @@ class Interpreter:
             y += check_dir[dir].y
             distance += 1
 
-        # print()
-
-        # return [
-        #     direct_danger,
-        #     bapple_distance != 0,
-        #     gapple_distance != 0,
-        # ]
-
         return [
             direct_danger,
             seg_distance,
@@ -127,8 +111,6 @@ class Interpreter:
             bapple_distance,
         ]
 
-        # return [False, False, False]
-
     def get_state(self):
         if not len(self.env.snake.segments):
             return np.zeros((20))
@@ -136,27 +118,7 @@ class Interpreter:
         self.compute_grid()
         for dir in Direction:
             state[dir] = self.__look_dir(dir)
-
-        # print(state)
-        # arr = list(
-        #     np.array(
-        #         [
-        #             [valeur[i] for valeur in state.values()]
-        #             for i in range(len(state[dir]))
-        #         ]
-        #     ).flatten()
-        # )
-
         arr = np.array(list(state.values())).flatten()
-
-        # arr.extend(
-        #     [
-        #         self.env.snake.direction == Direction.UP,
-        #         self.env.snake.direction == Direction.RIGHT,
-        #         self.env.snake.direction == Direction.DOWN,
-        #         self.env.snake.direction == Direction.LEFT,
-        #     ]
-        # )
         return arr
 
 

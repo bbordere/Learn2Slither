@@ -94,7 +94,6 @@ class TableAgent(BaseAgent):
         new_state = [
             (
                 state[i],
-                # state[i] or state[i + 1] == 1 or state[i + 2] == 1,
                 state[i + 3] != 1.0,
                 state[i + 4] != 1.0,
             )
@@ -127,9 +126,7 @@ class TableAgent(BaseAgent):
         next_state_index = self.state_to_index(next_state)
         current_q = self.q_table[state_index, action.value]
         max_next_q = np.max(self.q_table[next_state_index])
-        new_q = (1 - self.lr) * current_q + self.lr * (
-            reward + self.gamma * max_next_q
-        )
+        new_q = (1 - self.lr) * current_q + self.lr * (reward + self.gamma * max_next_q)
         self.q_table[state_index, action.value] = new_q
 
     def choose_best_action(self, state: np.ndarray) -> Direction:
@@ -142,14 +139,10 @@ class QNetwork(nn.Module):
         super().__init__()
         self.model = nn.Sequential(
             nn.Linear(input_size, 128),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(128, 128),
-            nn.ReLU(),
+            nn.LeakyReLU(),
             nn.Linear(128, output_size),
-        )
-        self.optim = optim.Adam(self.parameters(), lr=0.001)
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
         )
         self.device = torch.device("cpu")
         self.to(self.device)
@@ -195,9 +188,6 @@ class DQAgent(BaseAgent):
         self.batch_size = batch_size
         self.update_target_every = update_target_every
         self.steps = 0
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
         self.device = torch.device("cpu")
         self.policy_net = QNetwork(state_size, action_size)
         self.target_net = QNetwork(state_size, action_size)
@@ -230,9 +220,7 @@ class DQAgent(BaseAgent):
         next_states = torch.FloatTensor(np.array(next_states)).to(self.device)
         dones = torch.FloatTensor(np.array(dones)).to(self.device)
 
-        current_q_values = self.policy_net(states).gather(
-            1, actions.unsqueeze(1)
-        )
+        current_q_values = self.policy_net(states).gather(1, actions.unsqueeze(1))
         next_q_values = self.target_net(next_states).max(1)[0].detach()
         target_q_values = rewards + (1 - dones) * self.gamma * next_q_values
 

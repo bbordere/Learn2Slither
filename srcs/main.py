@@ -21,7 +21,7 @@ import joblib
 
 
 def main():
-    set_seed(42)
+    set_seed(4242)
 
     parser = ArgsParser()
     args = parser.args

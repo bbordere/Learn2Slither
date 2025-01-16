@@ -8,9 +8,13 @@ Size = namedtuple("Size", ["width", "height"])
 
 
 def convert_pos(seg: Pos):
-    return (LINE_WIDTH * (seg.x + 1) + BLOCK_WIDTH * seg.x), (
-        LINE_WIDTH * (seg.y + 1) + BLOCK_HEIGHT * seg.y
+    return (LINE_WIDTH * (seg.x + 1) + BLOCK_WIDTH * (seg.x + 1)), (
+        LINE_WIDTH * (seg.y + 1) + BLOCK_HEIGHT * (seg.y + 1)
     )
+
+
+def opposite(self):
+    return Direction((self.value + 2) % 4)
 
 
 class Direction(Enum):

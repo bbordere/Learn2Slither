@@ -9,25 +9,26 @@ import numpy as np
 from collections import deque
 from utils import *
 import math
+from SpriteManager import SpriteManager
 
 
 class Environment:
     def __init__(self, log_period: int = 100):
         self.is_running = True
         self.screen_size = Size(
-            width=BLOCK_WIDTH * GRID_WIDTH + LINE_WIDTH * (GRID_WIDTH + 1),
-            height=BLOCK_HEIGHT * GRID_HEIGHT + LINE_WIDTH * (GRID_HEIGHT + 1),
+            width=BLOCK_WIDTH * (GRID_WIDTH + 2) + LINE_WIDTH * (GRID_WIDTH + 1),
+            height=BLOCK_HEIGHT * (GRID_HEIGHT + 2) + LINE_WIDTH * (GRID_HEIGHT + 1),
         )
         self.screen = None
         self.consumables = list[Consumable]()
         self.snake = Snake()
+        self.memory = deque(maxlen=100)
         pg.init()
         self.clock = pg.time.Clock()
         self.reset()
         self.agent = None
         self.interpreter = None
         self.state = None
-        self.memory = deque(maxlen=50)
         self.logger = Logger(log_period=log_period)
         self.counter = 0
         self.distance = float("inf")
@@ -38,10 +39,18 @@ class Environment:
             pg.K_DOWN: Direction.DOWN,
         }
 
+        self.corner_directions = {
+            (0, 0): Direction.UP,
+            (0, GRID_HEIGHT + 1): Direction.RIGHT,
+            (GRID_WIDTH + 1, 0): Direction.LEFT,
+            (GRID_WIDTH + 1, GRID_HEIGHT + 1): Direction.DOWN,
+        }
+
     def reset(self):
         self.counter = 0
         self.distance = float("inf")
         self.consumables.clear()
+        self.memory.clear()
         self.snake.reset()
         self.__place_Consumable(BAD_APPLE_NUM, ConsumableType.BAD)
         self.__place_Consumable(GOOD_APPLE_NUM, ConsumableType.GOOD)
@@ -49,9 +58,7 @@ class Environment:
 
     def __place_Consumable(self, n: int, type: ConsumableType):
         for _ in range(n):
-            new = Pos(
-                x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1)
-            )
+            new = Pos(x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1))
 
             if (
                 len(self.snake.segments) + len(self.consumables)
@@ -62,9 +69,7 @@ class Environment:
             while new in self.snake.segments or new in [
                 c.pos for c in self.consumables
             ]:
-                new = Pos(
-                    x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1)
-                )
+                new = Pos(x=randint(0, GRID_WIDTH - 1), y=randint(0, GRID_HEIGHT - 1))
             self.consumables.append(Consumable(new, type))
 
     def get_closest_apple(self):
@@ -73,9 +78,9 @@ class Environment:
             if consu.type == ConsumableType.BAD:
                 continue
             dist = min(
-                math.sqrt(
-                    (self.snake.segments[0].x - consu.pos.x) ** 2
-                    + (self.snake.segments[0].y - consu.pos.y) ** 2
+                abs(
+                    (self.snake.segments[0].x - consu.pos.x)
+                    + (self.snake.segments[0].y - consu.pos.y)
                 ),
                 dist,
             )
@@ -91,9 +96,6 @@ class Environment:
         self.counter += 1
         self.memory.append(self.snake.segments[0])
 
-        if self.memory.count(self.snake.segments[0]) > 5:
-            reward = LOOP_REWARD
-
         for consu in self.consumables:
             if self.snake.is_touching(consu.pos):
                 self.consumables.remove(consu)
@@ -104,6 +106,9 @@ class Environment:
                     to_pop = 0
                 else:
                     to_pop = 2
+
+        if self.memory.count(self.snake.segments[0]) > 5:
+            reward = LOOP_REWARD
 
         closest_apple = self.get_closest_apple()
         if closest_apple < self.distance:
@@ -118,26 +123,54 @@ class Environment:
         if not len(self.snake.segments):
             return True, DEAD_REWARD
 
-        if self.counter >= (GRID_HEIGHT * GRID_WIDTH):
-            return True, -1
+        if self.counter >= (GRID_HEIGHT * GRID_WIDTH) // 2:
+            return True, LOOP_REWARD
 
         if render:
             self.draw()
         return False, reward
 
+    def __get_pos(self, row, col):
+        x = LINE_WIDTH * (col + 1) + (BLOCK_WIDTH * col)
+        y = LINE_WIDTH * (row + 1) + (BLOCK_HEIGHT * row)
+        return x, y
+
+    def __is_corner(self, row, col):
+        return row in (0, GRID_WIDTH + 1) and col in (0, GRID_HEIGHT + 1)
+
+    def __is_edge(self, row, col):
+        return row in (0, GRID_WIDTH + 1) or col in (0, GRID_HEIGHT + 1)
+
+    def __get_edge_sprite(self, row, col):
+        if row in (0, GRID_WIDTH + 1):
+            direction = Direction.UP if row == 0 else Direction.DOWN
+        else:
+            direction = Direction.LEFT if col == 0 else Direction.RIGHT
+        return self.sprite_manager.get_sprite("wall", direction)
+
+    def __get_corner_sprite(self, row, col):
+        direction = self.corner_directions.get((row, col))
+        return self.sprite_manager.get_sprite("wall_corner", direction)
+
+    def __get_sprite(self, row, col):
+        if self.__is_corner(row, col):
+            return self.__get_corner_sprite(row, col)
+        elif self.__is_edge(row, col):
+            return self.__get_edge_sprite(row, col)
+        else:
+            return self.sprite_manager.get_sprite("floor", Direction.UP)
+
     def draw(self):
-        for row in range(GRID_HEIGHT):
-            for col in range(GRID_WIDTH):
-                x = LINE_WIDTH * (col + 1) + (BLOCK_WIDTH * col)
-                y = LINE_WIDTH * (row + 1) + (BLOCK_HEIGHT * row)
-                pg.draw.rect(
-                    self.screen,
-                    (125, 125, 125),
-                    (x, y, BLOCK_WIDTH, BLOCK_HEIGHT),
-                )
+
+        for row in range(0, GRID_HEIGHT + 2):
+            for col in range(0, GRID_WIDTH + 2):
+                x, y = self.__get_pos(row, col)
+                sprite = self.__get_sprite(row, col)
+                self.screen.blit(sprite, (x, y))
+
         for c in self.consumables:
-            c.draw(self.screen)
-        self.snake.draw(self.screen)
+            c.draw(self.screen, self.sprite_manager)
+        self.snake.draw(self.screen, self.sprite_manager)
         pg.display.flip()
 
     def __handle_auto_event(self, step_mode: bool):
@@ -202,9 +235,7 @@ class Environment:
             #     f"Episode {episode}, Total Reward: {total_reward:.3f}, "
             #     f"Length: {len(self.snake.segments) - 1}, Epsilon: {self.agent.epsilon:.4f}"
             # )
-        self.logger.log_train(
-            episode, total_reward, len(self.snake.segments) - 1
-        )
+        self.logger.log_train(episode, total_reward, len(self.snake.segments) - 1)
         self.agent.final()
         self.agent.save()
 
@@ -279,20 +310,12 @@ class Environment:
                 )
                 for i in range(0, len(state), 5)
             ]
-            new_state = np.array(new_state).flatten()
-            for i in range(0, 11, 3):
-                print(
-                    Direction(i // 3),
-                    new_state[i],
-                    new_state[i + 1],
-                    new_state[i + 2],
-                )
-            print()
         # self.logger.final()
 
     def __init_window(self) -> None:
         self.screen = pg.display.set_mode(self.screen_size)
         pg.display.set_caption("Learn2Slither")
+        self.sprite_manager = SpriteManager()
 
     def update_caption(self, cap: str) -> None:
         pg.display.set_caption(f"Learn2Slither ({cap})")
