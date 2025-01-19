@@ -17,7 +17,7 @@ class Consumable:
         )
 
     def __str__(self):
-        return "G" if self.type == ConsumableType.GOOD else "R"
+        return "G" if self.type == ConsumableType.GOOD else "B"
 
     def draw(self, screen: pg.surface, sprite_manager: SpriteManager):
         x, y = convert_pos(self.pos)

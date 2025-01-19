@@ -21,32 +21,36 @@ import joblib
 
 
 def main():
-    set_seed(4242)
-
     parser = ArgsParser()
     args = parser.args
+    if args.seed != None:
+        set_seed(args.seed)
 
-    env = Environment()
+    env = Environment(log_period=100, file=args.log_file)
     interpreter = Interpreter(env)
-    # agent = TableAgent(2 ** (4 * 3), 4)
-    agent = DQAgent(4 * 5, 4)
+    # agent = TableAgent(2 ** (4 * 5), 4)
+    agent = DQAgent(4 * 5, 4, update_target_every=50)
 
     env.attach(interpreter)
 
-    if args.model:
-        agent.path = args.model
+    if args.load:
+        agent = joblib.load(args.load)
+        agent.load_path = args.load
+
+    if args.save:
+        agent.save_path = args.save
 
     if args.train or args.evaluate:
-        if args.evaluate:
-            agent = joblib.load(agent.path)
         env.attach(agent)
 
     env.run(
         episodes=args.episodes,
         train=args.train,
-        render=args.visual == "gui",
+        render=args.visual == "on",
         speed=args.speed,
         step_mode=args.step,
+        verbose=not args.no_vision,
+        stats=args.stats,
     )
 
 

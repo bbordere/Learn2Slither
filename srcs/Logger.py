@@ -8,6 +8,7 @@ class Logger:
     def __init__(self, log_period: int = 100, file: str = None):
         self.rewards = []
         self.lens = []
+        self.lifetimes = []
         self.log_period = log_period
         self.max_len = DEFAULT_LEN
 
@@ -53,9 +54,7 @@ class Logger:
                     tabulate(
                         self.stats,
                         header,
-                        tablefmt=(
-                            "simple_outline" if not self.file else "plain"
-                        ),
+                        tablefmt=("simple_outline" if not self.file else "plain"),
                     ),
                     file=self.file,
                 )
@@ -65,14 +64,48 @@ class Logger:
             self.rewards.append(rewards)
             self.lens.append(len)
 
-    def log_test(self, len: int):
-        print(f"Length: {len}", file=self.file)
-        self.max_len = max(self.max_len, len)
-        self.lens.append(len)
-
-    def final(self):
+    def log_test(self, episode: int, len: int, lifetime: int):
+        print("Game Over ! Resume: ", file=self.file)
         print(
-            f"Mean Length: {statistics.mean(self.lens)}",
-            f"Max Length: {self.max_len}",
+            tabulate(
+                [[episode, len, lifetime]],
+                headers=["Episode", "Length", "Lifetime"],
+                tablefmt=("simple_outline" if not self.file else "plain"),
+            ),
             file=self.file,
         )
+        self.max_len = max(self.max_len, len)
+        self.lens.append(len)
+        self.lifetimes.append(lifetime)
+
+    def final(self):
+
+        print("End-of-session summary:", file=self.file)
+        print(
+            tabulate(
+                [
+                    [
+                        len(self.lens),
+                        statistics.mean(self.lens),
+                        max(self.lens),
+                        statistics.mean(self.lifetimes),
+                        max(self.lifetimes),
+                    ]
+                ],
+                headers=[
+                    "Episodes",
+                    "Mean Length",
+                    "Max Length",
+                    "Mean Lifetime",
+                    "Max Lifetime",
+                ],
+                tablefmt=("simple_outline" if not self.file else "plain"),
+            ),
+            file=self.file,
+        )
+
+        # print(
+        #     f"Mean Length: {statistics.mean(self.lens)}",
+        #     f"Max Length: {self.max_len}",
+        #     file=self.file,
+        # )

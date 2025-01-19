@@ -20,7 +20,8 @@ class BaseAgent:
         epsilon: float = 0.1,
         epsilon_min: float = 0.001,
         epsilon_decay: float = 0.995,
-        path: str = "models/model.pth",
+        load_path: str = "models/model.pth",
+        save_path: str = "models/model.pth",
     ):
         self.state_size = state_size
         self.action_size = action_size
@@ -29,7 +30,8 @@ class BaseAgent:
         self.epsilon = epsilon
         self.epsilon_min = epsilon_min
         self.epsilon_decay = epsilon_decay
-        self.path = path
+        self.load_path = load_path
+        self.save_path = save_path
 
     def choose_action(self, state: np.ndarray) -> Direction:
         return choice(list(Direction))
@@ -38,10 +40,10 @@ class BaseAgent:
         return choice(list(Direction))
 
     def save(self) -> None:
-        dir_path = Path(self.path).resolve()
+        dir_path = Path(self.save_path).resolve()
         dir_path = dir_path.parents[0]
         dir_path.mkdir(parents=True, exist_ok=True)
-        joblib.dump(self, self.path)
+        joblib.dump(self, self.save_path)
 
     def update_epsilon(self) -> None:
         self.epsilon = max(self.epsilon * self.epsilon_decay, self.epsilon_min)
@@ -67,10 +69,11 @@ class TableAgent(BaseAgent):
         action_size: int,
         lr: float = 0.1,
         gamma: float = 0.9,
-        epsilon: float = 1.0,
+        epsilon: float = 0.9,
         epsilon_min: float = 0.01,
         epsilon_decay: float = 0.995,
-        path: str = "models/model_table.pth",
+        load_path: str = "models/model_table.pth",
+        save_path: str = "models/model_table.pth",
     ):
         super().__init__(
             state_size,
@@ -80,7 +83,8 @@ class TableAgent(BaseAgent):
             epsilon,
             epsilon_min,
             epsilon_decay,
-            path,
+            load_path,
+            save_path,
         )
         self.q_table = np.zeros((self.state_size, self.action_size))
 
@@ -91,16 +95,24 @@ class TableAgent(BaseAgent):
         return Direction(boltzmann_action_selection(q_values, self.epsilon))
 
     def state_to_index(self, state: np.ndarray) -> int:
-        new_state = [
-            (
-                state[i],
-                state[i + 3] != 1.0,
-                state[i + 4] != 1.0,
-            )
-            for i in range(0, len(state), 5)
-        ]
+        # new_state = [
+        #     (
+        #         state[i],
+        #         state[i + 3] != 1.0,
+        #         state[i + 4] != 1.0,
+        #     )
+        #     for i in range(0, len(state), 5)
+        # ]
+        # new_state = [
+        #     (
+        #         state[i],
+        #         state[i + 3] != 1.0,
+        #         state[i + 4] != 1.0,
+        #     )
+        #     for i in range(0, len(state), 5)
+        # ]
 
-        new_state = np.array(new_state).flatten()
+        new_state = np.array(state).flatten()
 
         return int("".join(map(str, map(int, new_state))), 2)
 
@@ -166,13 +178,14 @@ class DQAgent(BaseAgent):
         action_size: int,
         lr: float = 0.001,
         gamma: float = 0.99,
-        epsilon: float = 1.0,
+        epsilon: float = 0.9,
         epsilon_min: float = 0.01,
         epsilon_decay: float = 0.995,
-        memory_size: int = 10000,
+        memory_size: int = 10_000,
         batch_size: int = 64,
         update_target_every: int = 100,
-        path: str = "models/model_dqn.pth",
+        load_path: str = "models/model_dqn.pth",
+        save_path: str = "models/model_dqn.pth",
     ):
         super().__init__(
             state_size,
@@ -182,7 +195,8 @@ class DQAgent(BaseAgent):
             epsilon,
             epsilon_min,
             epsilon_decay,
-            path,
+            load_path,
+            save_path,
         )
         self.memory = deque(maxlen=memory_size)
         self.batch_size = batch_size

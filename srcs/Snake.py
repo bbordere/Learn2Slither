@@ -8,8 +8,6 @@ from SpriteManager import SpriteManager
 class Snake:
     def __init__(self):
         self.segments = list[Pos]()
-        self.body_color = (0, 0, 255)
-        self.head_color = (245, 67, 89)
         self.direction = None
         self.reset()
         self.dir_map = {
@@ -17,6 +15,16 @@ class Snake:
             Pos(1, 0): Direction.LEFT,
             Pos(0, -1): Direction.DOWN,
             Pos(0, 1): Direction.UP,
+        }
+        self.corner_angles = {
+            (Direction.RIGHT, Direction.UP): 180,
+            (Direction.UP, Direction.RIGHT): 0,
+            (Direction.RIGHT, Direction.DOWN): -90,
+            (Direction.DOWN, Direction.RIGHT): 90,
+            (Direction.LEFT, Direction.DOWN): 0,
+            (Direction.DOWN, Direction.LEFT): 180,
+            (Direction.LEFT, Direction.UP): 90,
+            (Direction.UP, Direction.LEFT): -90,
         }
 
     def reset(self):
@@ -58,7 +66,6 @@ class Snake:
     def draw(self, screen: pg.surface, sprite_manager: SpriteManager):
         last_seg = None
         dir = self.direction
-        last_dir = dir
         for i, seg in enumerate(self.segments):
             x, y = convert_pos(seg)
             if last_seg:
@@ -77,47 +84,15 @@ class Snake:
                     (seg.x - self.segments[i - 1].x, seg.y - self.segments[i - 1].y)
                 ]
 
-                angle = 0
-                if prev_dir == Direction.RIGHT and next_dir == Direction.UP:
-                    angle = 180  # Tourne de droite vers haut
-                elif prev_dir == Direction.UP and next_dir == Direction.RIGHT:
-                    angle = 0  # Tourne de haut vers droite
-
-                elif prev_dir == Direction.RIGHT and next_dir == Direction.DOWN:
-                    angle = -90  # Tourne de droite vers bas
-                elif prev_dir == Direction.DOWN and next_dir == Direction.RIGHT:
-                    angle = 90  # Tourne de bas vers droite
-
-                elif prev_dir == Direction.LEFT and next_dir == Direction.DOWN:
-                    angle = 0  # Tourne de gauche vers bas
-                elif prev_dir == Direction.DOWN and next_dir == Direction.LEFT:
-                    angle = 180  # Tourne de bas vers gauche
-
-                elif prev_dir == Direction.LEFT and next_dir == Direction.UP:
-                    angle = 90  # Tourne de gauche vers haut
-                elif prev_dir == Direction.UP and next_dir == Direction.LEFT:
-                    angle = -90  # Tourne de haut vers gauche
-
+                angle = self.corner_angles.get((prev_dir, next_dir))
                 if next_dir != dir and next_dir != opposite(dir):
-                    # print(angle)
                     c = sprite_manager.get_sprite("corner")
                     rotated_sprite = pg.transform.rotate(c, angle)
                     screen.blit(rotated_sprite, (x, y))
                 else:
                     screen.blit(sprite_manager.get_sprite("body", dir), (x, y))
-                # if 1:
-                # pass
-                # else:
-                # screen.blit(sprite_manager.get_sprite("body", dir), (x, y))
 
             last_seg = seg
-            last_dir = dir
-
-            # pg.draw.rect(
-            #     screen,
-            #     (self.head_color if seg == self.segments[0] else self.body_color),
-            #     (x, y, BLOCK_WIDTH, BLOCK_HEIGHT),
-            # )
 
     def move(self, dir: Direction):
         x, y = self.segments[0].x, self.segments[0].y
