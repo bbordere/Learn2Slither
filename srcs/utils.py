@@ -1,7 +1,7 @@
 from collections import namedtuple
 from enum import Enum
 
-from config import *
+from config import LINE_WIDTH, BLOCK_HEIGHT, BLOCK_WIDTH
 
 Pos = namedtuple("Pos", ["x", "y"])
 Size = namedtuple("Size", ["width", "height"])

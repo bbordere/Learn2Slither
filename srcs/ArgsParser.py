@@ -13,17 +13,24 @@ class ArgsParser:
             "-e", "--evaluate", help="Enable testing", action="store_true"
         )
 
-        self.parser.add_argument("-s", "--save", help="Model path", default=None)
-        self.parser.add_argument("-l", "--load", help="Model path", default=None)
-        self.parser.add_argument("--log_file", help="Log file path", default=None)
+        self.parser.add_argument(
+            "-s", "--save", help="Model path", default=None)
+        self.parser.add_argument(
+            "-l", "--load", help="Model path", default=None)
+        self.parser.add_argument(
+            "--log_file", help="Log file path", default=None)
 
-        self.parser.add_argument("--episodes", help="Episodes", type=int, default=10)
+        self.parser.add_argument(
+            "--episodes", help="Episodes", type=int, default=10)
 
-        self.parser.add_argument("--speed", help="Game speed", type=int, default=15)
+        self.parser.add_argument(
+            "--speed", help="Game speed", type=int, default=15)
 
-        self.parser.add_argument("--seed", help="Set seed", type=int, default=None)
+        self.parser.add_argument(
+            "--seed", help="Set seed", type=int, default=None)
 
-        self.parser.add_argument("--step", help="Enable Step mode", action="store_true")
+        self.parser.add_argument(
+            "--step", help="Enable Step mode", action="store_true")
         self.parser.add_argument(
             "--stats", help="Enable Stats plotting", action="store_true"
         )

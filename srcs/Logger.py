@@ -1,24 +1,30 @@
 import statistics
-from utils import *
+from config import DEFAULT_LEN
 from tabulate import tabulate
 import os
 
 
 class Logger:
+    """Logger class for training and testing
+    """
+
     def __init__(self, log_period: int = 100, file: str = None):
         self.rewards = []
         self.lens = []
         self.lifetimes = []
         self.log_period = log_period
         self.max_len = DEFAULT_LEN
-
         self.file = file
-        if self.file:
-            self.file = open(self.file, "w")
-
         self.stats = []
 
     def log_train(self, episode: int, rewards: float, len: int):
+        """Logs training progress at regular intervals.
+
+        Args:
+            episode (int): Current episode number.
+            rewards (float): Rewards earned current episode.
+            len (int): Length of snake of current episode
+        """
         if episode and episode % self.log_period == 0:
             self.max_len = max(self.max_len, max(self.lens))
             if self.file:
@@ -54,7 +60,8 @@ class Logger:
                     tabulate(
                         self.stats,
                         header,
-                        tablefmt=("simple_outline" if not self.file else "plain"),
+                        tablefmt=(
+                            "simple_outline" if not self.file else "plain"),
                     ),
                     file=self.file,
                 )
@@ -65,6 +72,13 @@ class Logger:
             self.lens.append(len)
 
     def log_test(self, episode: int, len: int, lifetime: int):
+        """Logs training progress at regular intervals.
+
+        Args:
+            episode (int): Current episode
+            len (int): Length of snake of current episode
+            lifetime (int): Snake's Lifetime of current episode
+        """
         print("Game Over ! Resume: ", file=self.file)
         print(
             tabulate(
@@ -79,7 +93,8 @@ class Logger:
         self.lifetimes.append(lifetime)
 
     def final(self):
-
+        """Prints an end-of-session summary
+        """
         print("End-of-session summary:", file=self.file)
         print(
             tabulate(
@@ -103,9 +118,3 @@ class Logger:
             ),
             file=self.file,
         )
-
-        # print(
-        #     f"Mean Length: {statistics.mean(self.lens)}",
-        #     f"Max Length: {self.max_len}",
-        #     file=self.file,
-        # )

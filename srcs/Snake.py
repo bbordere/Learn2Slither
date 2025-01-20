@@ -1,11 +1,14 @@
-from config import *
+from utils import Pos, Direction, convert_pos, opposite
+from config import GRID_HEIGHT, GRID_WIDTH, DEFAULT_LEN
 from random import randint, choice
 import pygame as pg
-from utils import *
 from SpriteManager import SpriteManager
 
 
 class Snake:
+    """Snake entity in the game
+    """
+
     def __init__(self):
         self.segments = list[Pos]()
         self.direction = None
@@ -28,6 +31,8 @@ class Snake:
         }
 
     def reset(self):
+        """Resets the snake to its initial state.
+        """
         self.segments.clear()
         self.segments.append(
             Pos(x=randint(1, GRID_WIDTH - 2), y=randint(1, GRID_HEIGHT - 2))
@@ -64,6 +69,12 @@ class Snake:
         self.segments.extend(c[1])
 
     def draw(self, screen: pg.surface, sprite_manager: SpriteManager):
+        """Draws the snake on the given screen using the provided sprite manager.
+
+        Args:
+            screen (pg.surface): Surface to draw on.
+            sprite_manager (SpriteManager): Manager for providing sprite
+        """
         last_seg = None
         dir = self.direction
         for i, seg in enumerate(self.segments):
@@ -78,10 +89,12 @@ class Snake:
 
             else:
                 next_dir = self.dir_map[
-                    (self.segments[i + 1].x - seg.x, self.segments[i + 1].y - seg.y)
+                    (self.segments[i + 1].x - seg.x,
+                     self.segments[i + 1].y - seg.y)
                 ]
                 prev_dir = self.dir_map[
-                    (seg.x - self.segments[i - 1].x, seg.y - self.segments[i - 1].y)
+                    (seg.x - self.segments[i - 1].x,
+                     seg.y - self.segments[i - 1].y)
                 ]
 
                 angle = self.corner_angles.get((prev_dir, next_dir))
@@ -95,6 +108,11 @@ class Snake:
             last_seg = seg
 
     def move(self, dir: Direction):
+        """Updates the snake's position based on the current direction.
+
+        Args:
+            dir (Direction): Direction of snake
+        """
         x, y = self.segments[0].x, self.segments[0].y
         if dir == Direction((self.direction.value + 2) % 4):
             dir = self.direction
@@ -109,7 +127,12 @@ class Snake:
         self.segments.insert(0, Pos(x, y))
         self.direction = dir
 
-    def is_colliding(self):
+    def is_colliding(self) -> bool:
+        """Checks if the snake's head is colliding with any part of itself.
+
+        Returns:
+            bool: Return if snake's head is colliding
+        """
         return (
             self.segments[0].x > GRID_WIDTH - 1
             or self.segments[0].x < 0
@@ -118,7 +141,15 @@ class Snake:
             or self.segments[0] in self.segments[1:-1]
         )
 
-    def is_touching(self, pos: Pos):
+    def is_touching(self, pos: Pos) -> bool:
+        """Checks if the snake head is touching the given position.
+
+        Args:
+            pos (Pos): Pos to check
+
+        Returns:
+            bool: Return if snake's head is touching
+        """
         return self.segments[0] == pos
 
 

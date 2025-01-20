@@ -14,10 +14,3 @@ DEAD_REWARD = -100
 LOOP_REWARD = -1
 CLOSER_REWARD = 3
 FARTHER_REWARD = -2
-
-# best
-# 100 │         38.39 │           54 │          405.45 │            689
-
-
-# retrained
-# 100 │          42.1 │           63 │          412.61 │            692
