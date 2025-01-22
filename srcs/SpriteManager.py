@@ -9,15 +9,15 @@ class SpriteManager:
 
     def __init__(self):
         self.sprites = {}
-        self.load_sprite("head", "assets/head.png")
-        self.load_sprite("body", "assets/body.png")
-        self.load_sprite("tail", "assets/tail.png")
-        self.load_sprite("corner", "assets/corner.png")
-        self.load_sprite("floor", "assets/floor.png")
-        self.load_sprite("apple", "assets/apple.png")
-        self.load_sprite("bad_apple", "assets/bad_apple.png")
-        self.load_sprite("wall", "assets/wall.png")
-        self.load_sprite("wall_corner", "assets/wall_corner.png")
+        self.load_sprite("head", "assets/sprites/head.png")
+        self.load_sprite("body", "assets/sprites/body.png")
+        self.load_sprite("tail", "assets/sprites/tail.png")
+        self.load_sprite("corner", "assets/sprites/corner.png")
+        self.load_sprite("floor", "assets/sprites/floor.png")
+        self.load_sprite("apple", "assets/sprites/apple.png")
+        self.load_sprite("bad_apple", "assets/sprites/bad_apple.png")
+        self.load_sprite("wall", "assets/sprites/wall.png")
+        self.load_sprite("wall_corner", "assets/sprites/wall_corner.png")
 
     def load_sprite(self, name: str, path: str):
         """Loads a sprite from the specified path and adds it to 

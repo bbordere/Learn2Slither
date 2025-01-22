@@ -5,6 +5,7 @@ from Consumable import Consumable
 from Agent import BaseAgent
 from Logger import Logger
 from utils import Direction, Size, ConsumableType, Pos
+from pathlib import Path
 
 import config
 from SpriteManager import SpriteManager
@@ -47,6 +48,7 @@ class Environment:
             (config.GRID_HEIGHT + 1, config.GRID_WIDTH + 1): Direction.DOWN,
         }
         self.stats = Stats()
+        self.stop = False
 
     def reset(self):
         """Reset the environment
@@ -118,8 +120,9 @@ class Environment:
         """
         self.snake.move(dir)
         if self.snake.is_colliding():
+            self.snake.segments.pop()
             return True, config.DEAD_REWARD
-        to_pop = 1
+
         reward = config.DEFAULT_REWARD
 
         self.counter += 1
@@ -131,20 +134,19 @@ class Environment:
                 reward = consu.reward
                 if consu.type == ConsumableType.GOOD:
                     self.counter = 0
-                    to_pop = 0
                 else:
-                    to_pop = 2
+                    self.snake.segments.pop()
 
         closest_apple = self.__get_closest_apple()
+
         if closest_apple <= self.distance:
             reward += config.CLOSER_REWARD
         elif self.counter:
             reward += config.FARTHER_REWARD
         self.distance = closest_apple
 
-        for _ in range(to_pop):
-            if len(self.snake.segments):
-                self.snake.segments.pop()
+        if self.counter:
+            self.snake.segments.pop()
 
         if not len(self.snake.segments):
             return True, config.DEAD_REWARD
@@ -154,6 +156,7 @@ class Environment:
 
         if render:
             self.draw()
+
         return False, reward
 
     def __get_pos(self, row: int, col: int) -> tuple[int, int]:
@@ -307,6 +310,15 @@ class Environment:
                   f"{Fore.CYAN}{action.name}{Style.RESET_ALL}", file=self.file)
         print(file=self.file)
 
+    def __stop(self, render: bool):
+        if not self.stop:
+            return False
+        if render:
+            pg.quit()
+        if self.stats:
+            self.stats.close(None)
+        return True
+
     def __train_loop(
         self,
         episodes: int = 100,
@@ -334,12 +346,16 @@ class Environment:
         """
         self.update_caption("Training")
         for episode in range(episodes):
+            if self.__stop(render):
+                return
+
             self.reset()
             state = self.interpreter.get_state()
             total_reward = 0
             lifetime = 0
             while self.is_running:
                 if render and not self.__handle_auto_event(step_mode):
+                    self.exit(True)
                     return
                 if render:
                     self.clock.tick(speed)
@@ -360,22 +376,24 @@ class Environment:
             self.agent.update_epsilon()
 
             self.logger.log_train(
-                episode + 1, total_reward, len(self.snake.segments) - 1
+                episode + 1, total_reward, len(self.snake.segments)
             )
 
             if stats:
                 self.stats.append(
                     episode=episode,
                     total_rewards=total_reward,
-                    len=len(self.snake.segments) - 1,
+                    len=len(self.snake.segments),
                     lifetime=lifetime,
                     epsilon=self.agent.epsilon,
                 )
                 self.stats.plot()
 
         self.logger.log_train(episode, total_reward,
-                              len(self.snake.segments) - 1)
+                              len(self.snake.segments))
         self.agent.final()
+        if stats:
+            self.stats.final()
         self.agent.save()
 
     def __test_loop(
@@ -405,6 +423,8 @@ class Environment:
         """
         self.update_caption("Testing")
         for episode in range(episodes):
+            if self.__stop(render):
+                return
             self.reset()
             state = self.interpreter.get_state()
             if render:
@@ -413,33 +433,47 @@ class Environment:
             total_reward = 0
             while self.is_running:
                 if render and not self.__handle_auto_event(step_mode):
+                    self.exit(False)
                     return
                 if render:
                     self.clock.tick(speed)
                 action = self.agent.choose_best_action(state)
                 if verbose:
                     self.__vision(action)
-                self.is_running, rewards = self.step(action, render=render)
+                done, rewards = self.step(action, render=render)
                 total_reward += rewards
-                self.is_running = not self.is_running
+                self.is_running = not done
                 if not self.is_running:
                     break
                 state = self.interpreter.get_state()
                 lifetime += 1
             self.logger.log_test(episode, len(
-                self.snake.segments) - 1, lifetime)
+                self.snake.segments), lifetime)
             if stats:
                 self.stats.append(
                     episode=episode,
                     total_rewards=total_reward,
-                    len=len(self.snake.segments) - 1,
+                    len=len(self.snake.segments),
                     lifetime=lifetime,
                     epsilon=self.agent.epsilon,
                 )
                 self.stats.plot()
+        self.logger.final()
         if stats:
             self.stats.final()
-        self.logger.final()
+
+    def __tmp_path(self):
+        path = Path(self.agent.save_path)
+        self.agent.save_path = str(path.parent / path.stem) + "_canceled.pth"
+
+    def exit(self, train: bool):
+        self.is_running = False
+        if train:
+            self.__tmp_path()
+            self.agent.save()
+            print(f"Trained agent saved into '{self.agent.save_path}' !")
+        else:
+            self.logger.final()
 
     def __agent_loop(
         self,
@@ -475,6 +509,20 @@ class Environment:
             self.__test_loop(episodes, render, speed,
                              step_mode, verbose, stats)
 
+    def __start_human(self):
+        self.update_caption("Human")
+        self.reset()
+        for i in range(3, 0, -1):
+            text = self.font.render(str(i), True, (255, 255, 255))
+            text_rect = text.get_rect(
+                center=(config.SCREEN_WIDTH/2, config.SCREEN_HEIGHT/2))
+            self.draw()
+            self.screen.blit(self.filter, (0, 0))
+            self.screen.blit(text, text_rect)
+            pg.display.flip()
+            self.clock.tick(1)
+        pass
+
     def __human_loop(
         self, render: bool = True, step_mode: bool = True, speed: int = 15
     ):
@@ -489,12 +537,11 @@ class Environment:
             speed (int, optional): The game speed when running.
                                     Default is 15.
         """
-        self.update_caption("Human")
-        self.reset()
-        self.draw()
-        self.clock.tick(0.5)
 
+        self.__start_human()
+        self.draw()
         while self.is_running:
+            self.counter = 0
             if not step_mode:
                 self.clock.tick(speed)
             action = None
@@ -514,15 +561,30 @@ class Environment:
             self.is_running = not self.is_running
             if not self.is_running:
                 break
+        print(f"Game Over ! Score: {len(self.snake.segments)}")
 
-    def __init_window(self):
-        """Init pygame window
+    def __init_gui(self) -> bool:
+        """Init gui components
+
+        Returns:
+            bool: Init sucess
         """
-        pg.init()
-        self.clock = pg.time.Clock()
-        self.screen = pg.display.set_mode(self.screen_size)
-        pg.display.set_caption("Learn2Slither")
-        self.sprite_manager = SpriteManager()
+        try:
+            pg.init()
+            pg.font.init()
+            self.clock = pg.time.Clock()
+            self.screen = pg.display.set_mode(self.screen_size)
+            pg.display.set_caption("Learn2Slither")
+            self.sprite_manager = SpriteManager()
+            self.filter = pg.Surface(
+                (config.SCREEN_WIDTH, config.SCREEN_HEIGHT))
+            self.filter.set_alpha(128)
+            self.filter.fill((0, 0, 0))
+            self.font = pg.font.Font("assets/fonts/PixelArmy.ttf", 48)
+        except Exception as e:
+            print(e)
+            return False
+        return True
 
     def update_caption(self, cap: str):
         """Update the window caption
@@ -560,8 +622,8 @@ class Environment:
             stats (bool, optional): Plot the statistics.
                                     Defaults to False.
         """
-        if render:
-            self.__init_window()
+        if render and not self.__init_gui():
+            return
 
         if self.agent and self.interpreter:
             self.__agent_loop(

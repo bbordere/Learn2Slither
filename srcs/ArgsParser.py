@@ -46,6 +46,14 @@ class ArgsParser:
             default="on",
         )
 
+        self.parser.add_argument(
+            "-m",
+            "--model",
+            help="Choose model type",
+            choices=["qtable", "dqn"],
+            default="dqn",
+        )
+
         self.args = self.parser.parse_args()
         assert (
             self.args.episodes >= 1

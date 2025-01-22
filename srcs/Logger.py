@@ -95,6 +95,8 @@ class Logger:
     def final(self):
         """Prints an end-of-session summary
         """
+        if not len(self.lens):
+            return
         print("End-of-session summary:", file=self.file)
         print(
             tabulate(

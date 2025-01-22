@@ -6,6 +6,9 @@ import numpy as np
 import torch
 from ArgsParser import ArgsParser
 import joblib
+import signal
+from argparse import Namespace
+import time
 
 
 def set_seed(seed: int):
@@ -17,22 +20,37 @@ def set_seed(seed: int):
     torch.manual_seed(seed)
 
 
+def signal_handler(args: Namespace, env: Environment):
+    env.stop = True
+
+
 def main():
     parser = ArgsParser()
     args = parser.args
     if args.seed is not None:
         set_seed(args.seed)
 
+    agent = TableAgent(
+        2 ** (4 * 4), 4) if args.model == "qtable" else DQAgent(4 * 4, 4)
+
     env = Environment(log_period=100, file=args.log_file)
     interpreter = Interpreter(env)
-    # agent = TableAgent(2 ** (4 * 5), 4)
-    agent = DQAgent(4 * 4, 4, update_target_every=100)
+
+    agent.epsilon = 0.1
 
     env.attach(interpreter)
 
-    if args.load:
-        agent = joblib.load(args.load)
-        agent.load_path = args.load
+    signal.signal(signal.SIGINT, lambda signal,
+                  frame: signal_handler(args, env))
+
+    try:
+        if args.load or args.evaluate:
+            if args.load:
+                agent.load_path = args.load
+            agent = joblib.load(agent.load_path)
+    except Exception as e:
+        print(e)
+        exit(1)
 
     if args.save:
         agent.save_path = args.save
@@ -49,6 +67,15 @@ def main():
         verbose=not args.no_vision,
         stats=args.stats,
     )
+
+    if env.stop:
+        if not env.agent:
+            exit()
+        msg = "Training" if args.train else "Testing"
+        msg += " session interrupted by user !"
+        print(msg)
+        env.exit(args.train)
+        exit()
 
 
 if __name__ == "__main__":

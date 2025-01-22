@@ -299,7 +299,7 @@ class DQAgent(BaseAgent):
         return Direction(boltzmann_action_selection(q_values, self.epsilon))
 
     def learn(self, state: np.ndarray, action: Direction,
-              reward: int, next_state: np.ndarray, done: bool):
+              reward: int, next_state: np.ndarray, done: np.ndarray):
         """Update Q-Network based on the give experience
 
         Args:
@@ -307,7 +307,7 @@ class DQAgent(BaseAgent):
             action (Direction): Action taken by agent
             reward (int): Reward received
             next_state (np.ndarray): Next state of environment
-            done (bool): Episode is done
+            done (np.ndarray): Episode is done
         """
         self.memory.append((state, action, reward, next_state, done))
         self.steps += 1
@@ -367,5 +367,4 @@ class DQAgent(BaseAgent):
 
 if __name__ == "__main__":
     net = QNetwork(1, 10)
-
     print(net.forward(torch.Tensor([1])))
