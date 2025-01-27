@@ -403,6 +403,7 @@ class Environment:
         if stats:
             self.stats.final()
         self.agent.save()
+        print(f"Trained agent saved into '{self.agent.save_path}' !")
 
     def __test_loop(
         self,
@@ -670,5 +671,4 @@ if __name__ == "__main__":
     agent = BaseAgent(10, 10)
     inter = Interpreter(env)
     env.attach(agent, inter)
-    # env.attach(inter)
     env.run(episodes=1, train=False, step_mode=False)

@@ -15,7 +15,7 @@ setup: $(VENV)/bin/activate
 	@ echo "$$HEADER"
 
 $(VENV)/bin/activate: requirement.txt
-	@ python3.11 -m venv $(VENV)
+	@ python3 -m venv $(VENV)
 	@ $(PIP) install -r requirement.txt
 
 clean:

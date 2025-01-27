@@ -133,13 +133,8 @@ class Interpreter:
             distance += 1
 
         return [
-            # seg_distance,
-            # wall_distance,
-            # gapple_distance,
-            # bapple_distance,
             float(direct_danger),
             float(seg_seen),
-            # float(wall_distance != 1.0),
             float(gapple_seen),
             float(bapple_seen),
         ]
