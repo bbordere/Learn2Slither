@@ -52,8 +52,8 @@ def init(args: Namespace, seed: int, env: Environment):
         signal.SIGINT, lambda signal, frame: signal_handler(args, env)
     )
     try:
-        if args.load or args.evaluate:
-            agent.load_path = args.load if args.load else agent.load_path
+        if args.load:
+            agent.load_path = args.load
             agent = joblib.load(agent.load_path)
     except Exception as e:
         print(e)
